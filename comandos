@@ -23,10 +23,78 @@ CREATE TABLE nombre (
 
 
 
---preguntar a Javier Calle not null en pk, 
---dominios, numeros negativos, 
---como se pone los mayeres menores, delete y update
---como sabes que el pedido ya esta cumplido
---meter atribudo registrado? en peidoArticuloCliente
---si borras tarjeta
---que pasa con los updates
+--Clase 20/03/2024
+/*
+    para salir del modo multilinea usar -> /
+    si hay error de compilacion y queremos verlos se pone -> Show errors trigger nombre_disparador;
+    borrar disparador -> drop trigger ins_contracts;
+    ver todas las vistas -> SELECT view_name FROM USER_views;
+
+    para mostrar por pantalla los avisos de depuracion
+    esto va dentro de consultas
+    SET SERVEROUTPUT ON
+    DBMS_OUTPUT.PUT_LINE('Pasa por aquí: '|| :new.phone);
+
+    rais_application_error (num entre -20999 y -20000, "mensaje")
+    en una vista solo hay instead of
+ */
+
+
+--ej pag 8 lab4
+CREATE OR REPLACE TRIGGER CHK_clause_date
+BEFORE INSERT OR UPDATE OF cl_date ON clauses_ALL
+FOR EACH ROW
+DECLARE 
+    signdate DATE;
+    baddate EXCEPTION;
+BEGIN
+    -- Consulta la fecha de firma del contrato asociado a la cláusula
+    SELECT signature INTO signdate
+    FROM contracts_ALL
+    WHERE referenc = :NEW.referenc AND rownum=1; --truco del almendruco (); -- Asumiendo que hay una columna contract_id en clauses_ALL
+
+    -- Si la fecha del contrato es posterior a la fecha de la cláusula, lanza una excepción
+    IF :NEW.cl_date > signdate 
+     THEN :NEW.cl_date := signdate;
+    END IF;
+    
+END CHK_clause_date;
+/
+
+--con subbloque tratamos la excepcion (begin end)
+
+
+--ej pag 9 lab4
+CREATE OR REPLACE TRIGGER CHK_clause_date
+BEFORE INSERT OR UPDATE OF cl_date ON clauses_ALL
+FOR EACH ROW
+DECLARE 
+    signdate DATE;
+    baddate EXCEPTION;
+BEGIN
+    -- Consulta la fecha de firma del contrato asociado a la cláusula
+    SELECT signature INTO signdate
+    FROM contracts_ALL
+    WHERE referenc = :NEW.referenc AND rownum=1; --truco del almendruco (); -- Asumiendo que hay una columna contract_id en clauses_ALL
+
+    -- Si la fecha del contrato es posterior a la fecha de la cláusula, lanza una excepción
+    IF :NEW.cl_date > signdate 
+     THEN RAISE baddate;
+    END IF;
+
+EXCEPTION
+    WHEN baddate THEN  
+     RAISE_APPLICATION_ERROR (-20001,'WRONG DATE!'); 
+END CHK_clause_date;
+/
+
+
+CREATE OR REPLACE TRIGGER delete_clause
+    INSTEAD OF DELETE ON clauses
+    FOR EACH ROW
+BEGIN 
+    UPDATE clauses_ALL
+        SET userid = USER,
+            dlt_date = SYSDATE
+        WHERE referenc=:OLD.referenc AND n_order=:OLD.n_order;
+END;
