@@ -1,0 +1,20 @@
+WITH pedidos_anonim 
+    AS (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
+						from 
+						lines_anonym l 
+						join 
+						(select orderdate, contact, dliv_country from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY') 
+						and 
+						o.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')
+						and
+						l.orderdate = o.orderdate
+						and
+						l.contact = o.contact)),
+    pedido_cliente AS (SELECT username, orderdate, barcode, price, TO_NUMBER(quantity), country from Client_Lines 
+                        where
+                        orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY' )),
+    total_pedidos AS (select contact as username, orderdate as orderdate, barcode as barcode, price as price, quantity as quantity, dliv_country as country from pedidos_anonim UNION select * from pedido_cliente)
+    select * from total_pedidos;
+    
+
