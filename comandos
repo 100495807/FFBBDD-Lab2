@@ -98,3 +98,9 @@ BEGIN
             dlt_date = SYSDATE
         WHERE referenc=:OLD.referenc AND n_order=:OLD.n_order;
 END;
+
+
+
+SELECT *
+FROM orders_anonym
+WHERE orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY');
