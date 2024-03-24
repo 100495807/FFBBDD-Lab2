@@ -14,7 +14,42 @@ WITH pedidos_anonim
     pedido_cliente AS (SELECT username, orderdate, barcode, price, TO_NUMBER(quantity), country from Client_Lines 
                         where
                         orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY' )),
-    total_pedidos AS (select contact as username, orderdate as orderdate, barcode as barcode, price as price, quantity as quantity, dliv_country as country from pedidos_anonim UNION select * from pedido_cliente)
-    select * from total_pedidos;
+    total_pedidos AS (select contact as username, orderdate as orderdate, barcode as barcode, 
+						price as price, quantity as quantity, dliv_country as country from pedidos_anonim UNION select * from pedido_cliente),
+	juntar_varietal AS (SELECT varietal, country, username, t.orderdate as orderdate, t.barcode as barcode, 
+						t.price as price, t.quantity as quantity
+				from total_pedidos t join References r on t.barcode = r.barcode
+				join products p on r.product = p.product),
+	cuenta_varietal AS (select country, varietal, COUNT(varietal) AS cantidad_varietal
+						FROM juntar_varietal
+						GROUP BY country, varietal),
+	pais_variedad AS (SELECT country, cantidad_varietal
+    					FROM cuenta_varietal
+						WHERE cantidad_varietal = (SELECT MAX(cantidad_varietal) FROM cuenta_varietal)
+						group by country, cantidad_varietal)
+    select * from pais_variedad;
     
 
+--select * from jun_refe;
+
+
+WITH pedidos_anonim --duda aqui por solo 300 lineas
+    AS (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
+						from 
+						lines_anonym l 
+						join 
+						(select orderdate, contact, dliv_country from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY') 
+						and 
+						o.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')
+						and
+						l.orderdate = o.orderdate
+						and
+						l.contact = o.contact)),
+	pedidos_anom_var as (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country, varietal
+						from 
+						lines_anonym l join References r on l.barcode = r.barcode join products p on r.product = p.product)
+    pedido_cliente AS (SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity), country from Client_Lines cl
+						join References r on cl.barcode = r.barcode join products p on r.product = p.product
+                        where
+                        orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')),
