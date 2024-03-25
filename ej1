@@ -32,8 +32,8 @@ WITH pedidos_anonim
 
 --select * from jun_refe;
 
-
-WITH pedidos_anonim --duda aqui por solo 300 lineas
+--mas proximo
+WITH pedidos_anonim 
     AS (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
 						from 
 						lines_anonym l 
@@ -46,10 +46,42 @@ WITH pedidos_anonim --duda aqui por solo 300 lineas
 						l.orderdate = o.orderdate
 						and
 						l.contact = o.contact)),
-	pedidos_anom_var as (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country, varietal
+	pedidos_anom_var as (select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, dliv_country as country, varietal
 						from 
-						lines_anonym l join References r on l.barcode = r.barcode join products p on r.product = p.product)
-    pedido_cliente AS (SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity), country from Client_Lines cl
+						pedidos_anonim l join References r on l.barcode = r.barcode join products p on r.product = p.product),
+    pedido_cliente AS (SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, country, varietal from Client_Lines cl
 						join References r on cl.barcode = r.barcode join products p on r.product = p.product
                         where
                         orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')),
+	total_pedidos AS (select * from pedidos_anom_var UNION select * from pedido_cliente),
+	contado_varietal AS (SELECT varietal, COUNT(varietal) as contacion, country, username from total_pedidos group by country, varietal, username),
+	ranked AS (SELECT varietal, country, RANK() OVER (PARTITION BY country ORDER BY contacion DESC) AS varietal_rank
+    			FROM contado_varietal)
+	select * from ranked;
+
+
+WITH pedidos_anonim 
+    AS (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
+						from 
+						lines_anonym l 
+						join 
+						(select orderdate, contact, dliv_country from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY') 
+						and 
+						o.orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')
+						and
+						l.orderdate = o.orderdate
+						and
+						l.contact = o.contact)),
+	pedidos_anom_var as (select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, dliv_country as country, varietal
+						from 
+						pedidos_anonim l join References r on l.barcode = r.barcode join products p on r.product = p.product),
+    pedido_cliente AS (SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, country, varietal from Client_Lines cl
+						join References r on cl.barcode = r.barcode join products p on r.product = p.product
+                        where
+                        orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')),
+	total_pedidos AS (select * from pedidos_anom_var UNION select * from pedido_cliente),
+	contado_varietal AS (SELECT varietal, quantity, country, username from total_pedidos group by country, varietal, quantity ,username),
+	ranked AS (SELECT varietal, country, RANK() OVER (PARTITION BY country ORDER BY contacion DESC) AS varietal_rank
+    			FROM contado_varietal)
+	select * from ranked;
