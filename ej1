@@ -73,15 +73,26 @@ WITH pedidos_anonim
 						l.orderdate = o.orderdate
 						and
 						l.contact = o.contact)),
+
 	pedidos_anom_var as (select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, dliv_country as country, varietal
 						from 
 						pedidos_anonim l join References r on l.barcode = r.barcode join products p on r.product = p.product),
+
     pedido_cliente AS (SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, country, varietal from Client_Lines cl
 						join References r on cl.barcode = r.barcode join products p on r.product = p.product
                         where
                         orderdate BETWEEN TO_DATE('01/01/23', 'DD/MM/YY') AND TO_DATE('31/12/23', 'DD/MM/YY')),
+
 	total_pedidos AS (select * from pedidos_anom_var UNION select * from pedido_cliente),
-	contado_varietal AS (SELECT varietal, quantity, country, username from total_pedidos group by country, varietal, quantity ,username),
-	ranked AS (SELECT varietal, country, RANK() OVER (PARTITION BY country ORDER BY contacion DESC) AS varietal_rank
-    			FROM contado_varietal)
-	select * from ranked;
+
+	variedad_mas_vendida AS (SELECT country, varietal, RANK() OVER (PARTITION BY country ORDER BY COUNT(DISTINCT username) DESC) as ranking
+    						FROM total_pedidos GROUP BY country, varietal),
+
+	ranked AS (SELECT country, varietal, ranking FROM variedad_mas_vendida where ranking = 1),
+	
+	total_unidades_ingresos AS (SELECT country, varietal, SUM(quantity) AS total_unidades_vendidas, SUM(price * quantity) AS ingreso_total,
+                                AVG(quantity) AS promedio_unidades_referencia,
+                                COUNT(DISTINCT country) OVER (PARTITION BY varietal) AS paises_consumidores_potenciales
+                                FROM total_pedidos GROUP BY country, varietal)
+	
+	Bestsellers_Geographic_Report as ()
