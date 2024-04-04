@@ -1,0 +1,39 @@
+WITH pedidos_anonim 
+    AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
+						from 
+						lines_anonym l 
+						join 
+						(select orderdate, contact, dliv_country from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY') 
+						and 
+						o.orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
+						and
+						l.orderdate = o.orderdate
+						and
+						l.contact = o.contact)),
+	pedidos_anom_var as (select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, dliv_country as country, trim(varietal) as varietal
+						from 
+						pedidos_anonim l join References r on l.barcode = r.barcode join products p on r.product = p.product),
+    pedido_cliente AS (SELECT trim(username), orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, country, trim(varietal) as varietal from Client_Lines cl
+						join References r on cl.barcode = r.barcode join products p on r.product = p.product
+                        where
+                        orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')),
+	total_pedidos AS (select * from pedidos_anom_var UNION select * from pedido_cliente),
+    rep_barcode_mesXmes as (select count('X') barcode, to_char(orderdate, 'MM/YY ') as mes from total_pedidos 
+                            group by barcode, to_char(orderdate, 'MM/YY ')),
+    barcode_mas_vend_mesXmes as (select max(barcode), mes from rep_barcode_mesXmes 
+                                    group by barcode, mes)
+select * from barcode_mas_vend_mesXmes order by mes;
+
+
+/*select to_char(orderdate, 'MM/YY ') as mes, count('X') barcode
+from total_pedidos
+group by to_char(orderdate, 'MM/YY ');*/
+
+/*rep_barcode_mesXmes AS (SELECT barcode, TO_CHAR(orderdate, 'MM/YY') AS mes,
+                            ROW_NUMBER() OVER (PARTITION BY TO_CHAR(orderdate, 'MM/YY') ORDER BY quantity DESC) AS rn
+                            FROM total_pedidos)
+SELECT barcode, mes
+FROM rep_barcode_mesXmes
+WHERE rn = 1
+ORDER BY mes;*/
