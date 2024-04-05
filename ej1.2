@@ -1,29 +1,67 @@
-WITH pedidos_anonim 
-    AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
+WITH 
+pedidos_anonim  AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.pais
 						from 
 						lines_anonym l 
 						join 
-						(select orderdate, contact, dliv_country from orders_anonym) o
-						on (l.orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY') 
+						(select orderdate, contact, trim(dliv_country) pais from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/04/23', 'YY/MM/DD') AND TO_DATE('31/03/24', 'DD/MM/YY') 
 						and 
 						o.orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
 						and
 						l.orderdate = o.orderdate
 						and
-						l.contact = o.contact)),
-	pedidos_anom_var as (select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, dliv_country as country, trim(varietal) as varietal
-						from 
-						pedidos_anonim l join References r on l.barcode = r.barcode join products p on r.product = p.product),
-    pedido_cliente AS (SELECT trim(username), orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, country, trim(varietal) as varietal from Client_Lines cl
-						join References r on cl.barcode = r.barcode join products p on r.product = p.product
-                        where
-                        orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')),
-	total_pedidos AS (select * from pedidos_anom_var UNION select * from pedido_cliente),
-    rep_barcode_mesXmes as (select count('X') barcode, to_char(orderdate, 'MM/YY ') as mes from total_pedidos 
-                            group by barcode, to_char(orderdate, 'MM/YY ')),
-    barcode_mas_vend_mesXmes as (select max(barcode), mes from rep_barcode_mesXmes 
+						l.contact = o.contact)
+),
+pedidos_anom_var as (
+	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, trim(varietal) as varietal
+	from pedidos_anonim l 
+	join References r on l.barcode = r.barcode 
+	join products p on r.product = p.product
+),
+pedido_cliente AS (
+	SELECT trim(username), orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, 
+	trim(country) country, trim(varietal) as varietal 
+	from Client_Lines cl
+	join References r on cl.barcode = r.barcode 
+	join products p on r.product = p.product
+    where
+	orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
+),
+total_pedidos AS (
+	SELECT * FROM pedidos_anom_var 
+	UNION ALL 
+	SELECT * FROM pedido_cliente
+),
+pedidos_con_mes AS (
+    SELECT  username, barcode, price, quantity, country, varietal, TO_CHAR(orderdate, 'YY/MM') AS mes
+    FROM total_pedidos
+),
+ped_con_costes AS (
+    SELECT 
+      p.username, p.barcode, p.price, p.quantity, p.country, p.varietal, p.mes,
+      (SELECT cost FROM Supply_Lines s WHERE s.barcode = p.barcode AND ROWNUM = 1) AS cost
+    FROM
+      pedidos_con_mes p
+),
+barcode_mas_vendido_por_mes AS (
+    SELECT mes, barcode, count(*) as veces_vendido ,ROW_NUMBER() OVER (PARTITION BY mes ORDER BY COUNT(*) DESC) AS mas_vendido,
+	SUM(quantity) AS unidades_vendidas,
+	SUM(price * quantity) AS ingresos_totales,
+	SUM((price - cost) * quantity) AS beneficio_total
+    FROM ped_con_costes
+    GROUP BY mes, barcode
+)
+SELECT mes, barcode, veces_vendido, unidades_vendidas, ingresos_totales, beneficio_total
+FROM barcode_mas_vendido_por_mes
+WHERE mas_vendido = 1;
+
+
+
+
+
+/*barcode_mas_vend_mesXmes as (select max(barcode), mes from rep_barcode_mesXmes 
                                     group by barcode, mes)
-select * from barcode_mas_vend_mesXmes order by mes;
+select * from barcode_mas_vend_mesXmes order by mes;*/
 
 
 /*select to_char(orderdate, 'MM/YY ') as mes, count('X') barcode
@@ -37,3 +75,49 @@ SELECT barcode, mes
 FROM rep_barcode_mesXmes
 WHERE rn = 1
 ORDER BY mes;*/
+
+WITH 
+pedidos_anonim  AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.pais
+						from 
+						lines_anonym l 
+						join 
+						(select orderdate, contact, trim(dliv_country) pais from orders_anonym) o
+						on (l.orderdate BETWEEN TO_DATE('01/04/23', 'YY/MM/DD') AND TO_DATE('31/03/24', 'DD/MM/YY') 
+						and 
+						o.orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
+						and
+						l.orderdate = o.orderdate
+						and
+						l.contact = o.contact)
+),
+pedidos_anom_var as (
+	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, trim(varietal) as varietal
+	from pedidos_anonim l 
+	join References r on l.barcode = r.barcode 
+	join products p on r.product = p.product
+),
+pedido_cliente AS (
+	SELECT trim(username), orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, 
+	trim(country) country, trim(varietal) as varietal 
+	from Client_Lines cl
+	join References r on cl.barcode = r.barcode 
+	join products p on r.product = p.product
+    where
+	orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
+),
+total_pedidos AS (
+	SELECT * FROM pedidos_anom_var 
+	UNION ALL 
+	SELECT * FROM pedido_cliente
+),
+rep_barcode_mesXmes AS (
+	SELECT barcode, varietal, TO_CHAR(orderdate, 'YY/MM') AS mes, quantity, 
+	ROW_NUMBER() OVER (PARTITION BY TO_CHAR(orderdate, 'YY/MM') ORDER BY quantity DESC) AS mas_vendido
+    FROM total_pedidos
+),
+barcode_mas_vendido as (
+	SELECT barcode, varietal, mes, quantity
+	FROM rep_barcode_mesXmes
+	WHERE mas_vendido = 1
+	ORDER BY mes)
+select * from barcode_mas_vendido;
