@@ -36,6 +36,7 @@ pedidos_con_mes AS (
     SELECT  username, barcode, price, quantity, country, varietal, TO_CHAR(orderdate, 'YY/MM') AS mes
     FROM total_pedidos
 ),
+--supuesto semantico implicito si se repiten barcodes se coge el primero
 ped_con_costes AS (
     SELECT 
       p.username, p.barcode, p.price, p.quantity, p.country, p.varietal, p.mes,
