@@ -2,7 +2,7 @@
 
 -- informacion de pedidos anonimos
 WITH 
-pedidos_anonim  AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.pais
+pedidos_anonim  AS (select l.contact as contact, l.orderdate, l.barcode, l.price, l.quantity, o.pais
 						from 
 						lines_anonym l 
 						join 
@@ -17,15 +17,15 @@ pedidos_anonim  AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l
 ),
 -- informacion de clientes anonimos y pedios
 pedidos_anom_var as (
-	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, trim(varietal) as varietal
+	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, varietal as varietal
 	from pedidos_anonim l 
 	join References r on l.barcode = r.barcode 
 	join products p on r.product = p.product
 ),
 -- informacion clientes reg y pedidos
 pedido_cliente AS (
-	SELECT trim(username), orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, 
-	trim(country) country, trim(varietal) as varietal 
+	SELECT username, orderdate, cl.barcode, cl.price, TO_NUMBER(cl.quantity) as quantity, 
+	trim(country) as country, varietal 
 	from Client_Lines cl
 	join References r on cl.barcode = r.barcode 
 	join products p on r.product = p.product
@@ -58,25 +58,7 @@ ranked as (
 ),
 -- Total de compradores por país y variedad
 total_compradores AS (
-    SELECT country, varietal, COUNT(DISTINCT username) AS total_compradores
-    FROM total_pedidos
-    GROUP BY country, varietal
-),
--- Total de unidades vendidas por país y variedad
-total_unidades AS (
-    SELECT country, varietal, SUM(quantity) AS total_unidades_vendidas
-    FROM total_pedidos
-    GROUP BY country, varietal
-),
--- Ingreso total por país y variedad
-ingreso_total AS (
-    SELECT country, varietal, SUM(price * quantity) AS ingreso_total
-    FROM total_pedidos
-    GROUP BY country, varietal
-),
--- Promedio de unidades vendidas por referencia por país y variedad
-promedio_unidades AS (
-    SELECT country, varietal, AVG(quantity) AS promedio_unidades_referencia
+    SELECT country, varietal, COUNT(DISTINCT username) AS total_compradores, SUM(quantity) AS total_unidades_vendidas, SUM(price * quantity) AS ingreso_total, AVG(quantity) AS promedio_unidades_referencia
     FROM total_pedidos
     GROUP BY country, varietal
 ),
@@ -96,12 +78,9 @@ paises_consumidores AS (
 -- Unir la variedad más vendida con la información adicional
 Bestsellers_Geographic_Report as (
 SELECT r.country, r.varietal, r.num_pedidos,
-    tc.total_compradores, tu.total_unidades_vendidas, it.ingreso_total, pu.promedio_unidades_referencia, pc.paises_consumidores_potenciales
+    tc.total_compradores, tc.total_unidades_vendidas, tc.ingreso_total, tc.promedio_unidades_referencia, pc.paises_consumidores_potenciales
 FROM ranked r
 LEFT JOIN total_compradores tc ON r.country = tc.country AND r.varietal = tc.varietal
-LEFT JOIN total_unidades tu ON r.country = tu.country AND r.varietal = tu.varietal
-LEFT JOIN ingreso_total it ON r.country = it.country AND r.varietal = it.varietal
-LEFT JOIN promedio_unidades pu ON r.country = pu.country AND r.varietal = pu.varietal
 LEFT JOIN paises_consumidores pc ON r.varietal = pc.varietal
 )
 --consulta
@@ -111,7 +90,7 @@ select * from Bestsellers_Geographic_Report order by country;
 
 
 
-
+--mas proximo
 /*
 WITH pedidos_anonim 
     AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l.price, l.quantity, o.pais
@@ -186,7 +165,7 @@ WITH pedidos_anonim
 
 --select * from jun_refe;
 
---mas proximo
+
 WITH pedidos_anonim 
     AS (select l.contact, l.orderdate, l.barcode, l.price, l.quantity, o.dliv_country
 						from 
