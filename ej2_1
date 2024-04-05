@@ -1,20 +1,31 @@
 CREATE OR REPLACE PACKAGE caffeine AS
     -- Procedimiento para convertir borradores de pedidos en pedidos confirmados
+    PROCEDURE Set_Replacement_Orders;
+    PROCEDURE Informe_Proveedor(taxID Char(10))
+END caffeine;
+/
+
+CREATE OR REPLACE PACKAGE BODY caffeine AS
+    -- Procedimiento para convertir borradores de pedidos en pedidos confirmados
     PROCEDURE Set_Replacement_Orders IS
     BEGIN
-        -- Actualizar el estado de los pedidos borradores a pedidos confirmados
+        -- Actualizar el puto estado de los pedidos borradores a pedidos confirmados profe mdhp
         UPDATE Replacements
         SET status = 'P' -- 'P'  representa el estado de "confirmado"
-        WHERE status = 'D'; -- 'D' representa el estado de "borrador"
+        WHERE status = 'D'; -- 'D' representa el estado de "borrador";
 
     EXCEPTION
-        when no_data_found then dbms_output.put_line('No hay datos')
-        -- Puedes agregar más lógica si es necesario, como enviar notificaciones, etc.
+        WHEN no_data_found THEN 
+            dbms_output.put_line('No hay datos');
     END Set_Replacement_Orders;
-    
-    -- Procedimiento para obtener estadísticas e información detallada sobre un proveedor
-    PROCEDURE Provider_Report(CIF CHAR(10)); 
+
+    PROCEDURE Informe_Proveedor(CIF  Char(10)) IS
+    confirmados NUMBER
+    BEGIN  
+        select count('x') into confirmados from (Replacements where status = 'P' 
+        and orderdate> SYSDATE- 365)
 
 
 END caffeine;
 /
+
