@@ -1,0 +1,44 @@
+CREATE PROFILE cliente LIMIT
+  SESSIONS_PER_USER UNLIMITED
+  CPU_PER_SESSION UNLIMITED
+  CPU_PER_CALL UNLIMITED
+  CONNECT_TIME UNLIMITED
+  IDLE_TIME UNLIMITED
+  LOGICAL_READS_PER_SESSION UNLIMITED
+  LOGICAL_READS_PER_CALL UNLIMITED
+  PRIVATE_SGA UNLIMITED
+  FAILED_LOGIN_ATTEMPTS 3
+  PASSWORD_LIFE_TIME 180
+  PASSWORD_REUSE_TIME 365
+  PASSWORD_REUSE_MAX UNLIMITED
+  PASSWORD_VERIFY_FUNCTION null;
+
+CREATE ROLE cliente_role IDENTIFIED BY contraseña;
+GRANT cliente TO cliente_role;
+
+
+CREATE OR REPLACE PACKAGE user_pkg AS
+    current_user_name return VARCHAR2(30);
+END user_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY user_pkg AS
+  FUNCTION current_user RETURN VARCHAR2 IS
+  BEGIN
+    RETURN USER;
+  END current_user;
+END user_pkg;
+
+create profile client
+
+SELECT current_user_pkg.current_user_name FROM dual;
+
+create or replace view Mis_compras as(
+    select barcode, username from xd
+    where username = dual
+);
+
+
+INSERT INTO xd (username, barcode)
+VALUES
+('fsdb180', 'IOI83595O216284');
