@@ -1,5 +1,5 @@
 CREATE OR REPLACE TRIGGER update_endorsed
-BEFORE INSERT OR UPDATE ON Posts
+BEFORE INSERT OR UPDATE ON aux_posts
 FOR EACH ROW
 DECLARE
     v_endorsed_date DATE;
@@ -19,3 +19,95 @@ BEGIN
     END IF;
 END;
 /
+
+drop table aux_posts;
+CREATE TABLE aux_posts (
+  username   VARCHAR2(30),
+  postdate   DATE,
+  barCode    CHAR(15),
+  product    VARCHAR2(50) NOT NULL,
+  score      NUMBER(1) NOT NULL, 
+  title      VARCHAR2(50),
+  likes      NUMBER(9) DEFAULT(0) NOT NULL, 
+  endorsed   DATE,
+  text       VARCHAR2(2000) NOT NULL
+);
+
+INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (
+    'FSDB180',
+    TO_DATE('2024-04-06', 'YYYY-MM-DD'),
+    '123456789012345',
+    'Coffee Beans',
+    5,
+    'Great Coffee Beans',
+    'These coffee beans are of excellent quality. I highly recommend them!',
+    10,
+    NULL
+);
+INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (
+    'FSDB180',
+    TO_DATE('2024-04-07', 'YYYY-MM-DD'),
+    '123456789012345',
+    'Coffee Beans',
+    5,
+    'Great Coffee Beans',
+    'These coffee beans are of excellent quality. I highly recommend them!',
+    0,
+    NULL
+);
+INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (
+    'FSDB180',
+    TO_DATE('2024-04-09', 'YYYY-MM-DD'),
+    '123456789012345',
+    'Coffee Beans',
+    5,
+    'Great Coffee Beans',
+    'These coffee beans are of excellent quality. I highly recommend them!',
+    0,
+    TO_DATE('2024-04-09', 'YYYY-MM-DD')
+);
+
+
+UPDATE mis_comentarios
+SET text = 'Este es el nuevo texto del comentario'
+WHERE title = 'ZQVrkeOr';
+
+
+
+--2--
+
+CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
+AFTER DELETE ON Clients
+FOR EACH ROW
+DECLARE
+BEGIN
+    -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, dliv_datetime, 
+        name, surn1, surn2, 
+        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town
+    )
+    SELECT 
+        orderdate, username, town, country, dliv_datetime, bill_town, bill_country, discount
+    FROM 
+        Orders_Clients
+    WHERE 
+        username = :OLD.username;
+
+    -- Confirmar los cambios
+    COMMIT;
+    
+    -- Mostrar un mensaje de éxito
+    DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anónimas exitosamente.');
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Manejar cualquier error que pueda ocurrir durante el proceso
+        DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
+        ROLLBACK; -- Deshacer cualquier cambio en caso de error
+END TrasladarComprasAnonimas;
+/
+
