@@ -94,3 +94,103 @@ WHERE c.username = user_pkg.current_user;
 
 
 select * from Mi_perfil;
+
+
+-- 3 --
+CREATE TABLE Posts_aux (
+  username   VARCHAR2(30),
+  postdate   DATE,
+  barCode    CHAR(15),
+  product    VARCHAR2(50) NOT NULL,
+  score      NUMBER(1) NOT NULL, 
+  title      VARCHAR2(50),
+  text       VARCHAR2(2000) NOT NULL, 
+  likes      NUMBER(9) DEFAULT(0) NOT NULL, 
+  endorsed   DATE
+);
+
+INSERT INTO Posts_aux (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (
+    'FSDB180',
+    TO_DATE('2024-04-06', 'YYYY-MM-DD'),
+    '123456789012345',
+    'Coffee Beans',
+    5,
+    'Great Coffee Beans',
+    'These coffee beans are of excellent quality. I highly recommend them!',
+    10,
+    NULL
+);
+INSERT INTO Posts_aux (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (
+    'FSDB180',
+    TO_DATE('2024-04-07', 'YYYY-MM-DD'),
+    '123456789012345',
+    'Coffee Beans',
+    5,
+    'Great Coffee Beans',
+    'These coffee beans are of excellent quality. I highly recommend them!',
+    0,
+    NULL
+);
+
+CREATE OR REPLACE VIEW mis_comentarios AS
+SELECT *
+FROM Posts_aux
+WHERE username = user_pkg.current_user;
+
+-- insertar comentarios -- 
+CREATE OR REPLACE TRIGGER insert_comentario_trigger
+BEFORE INSERT ON mis_comentarios
+FOR EACH ROW
+BEGIN
+  IF :NEW.likes > 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'No se pueden insertar comentarios con "likes" mayores que cero.');
+  END IF;
+END;
+/
+
+-- Actualizar comentarios --
+CREATE OR REPLACE TRIGGER update_comentario_trigger
+BEFORE UPDATE ON Posts_aux
+FOR EACH ROW
+BEGIN
+  IF :OLD.likes > 0 THEN
+    RAISE_APPLICATION_ERROR(-20002, 'No se puede cambiar el texto de un comentario con "likes" mayores que cero.');
+  END IF;
+END;
+/
+
+-- Eliminar comentarios --
+CREATE OR REPLACE TRIGGER delete_comentario_trigger
+BEFORE DELETE ON Posts_aux
+FOR EACH ROW
+BEGIN
+  IF :OLD.likes > 0 THEN
+    RAISE_APPLICATION_ERROR(-20003, 'No se puede eliminar un comentario con "likes" mayores que cero.');
+  END IF;
+END;
+/
+
+
+select * from mis_comentarios;
+
+-- Error al eliminar el comentario existente
+DELETE FROM mis_comentarios
+WHERE postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
+
+-- Error al introducir el comentario
+INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (user_pkg.current_user, SYSDATE, 'barCode', 'producto', 5, 'título', 'Nuevo texto del comentario', 7, NULL);
+
+-- Error al actualizar el comentario
+UPDATE Posts_aux
+SET text = 'Este es el nuevo texto del comentario'
+WHERE username = user_pkg.current_user  -- Usuario del comentario
+AND postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
+
+-- Actualizar el comentario
+UPDATE Posts_aux
+SET text = 'Este es el nuevo texto del comentario'
+WHERE username = user_pkg.current_user  -- Usuario del comentario
+AND postdate = TO_DATE('2024-04-07', 'YYYY-MM-DD');
