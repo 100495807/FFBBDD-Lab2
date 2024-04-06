@@ -82,25 +82,62 @@ WHERE title = 'ZQVrkeOr';
 CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
 AFTER DELETE ON Clients
 FOR EACH ROW
-DECLARE
 BEGIN
     -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
     INSERT INTO Orders_Anonym (
-        orderdate, contact, dliv_datetime, 
-        name, surn1, surn2, 
+        orderdate, contact, dliv_datetime,
+        name, surn1,
         bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
-        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
     )
-    SELECT 
-        orderdate, username, town, country, dliv_datetime, bill_town, bill_country, discount
-    FROM 
-        Orders_Clients
-    WHERE 
-        username = :OLD.username;
+    SELECT
+        l.orderdate, :OLD.username,  l.dliv_datetime,
+        :OLD.username,:OLD.username
+        c.waytype, c.wayname, c.gate, c.block, c.stairw, c.floor, c.door, c.ZIP, c.town, c.country,
+        c.waytype, c.wayname, c.gate, c.block, c.stairw, c.floor, c.door, c.ZIP, c.town, c.country
+    FROM
+        Client_Lines l
+    JOIN
+        Client_Addresses c ON l.username = c.username AND l.town = c.town AND l.country = c.country
+    WHERE
+        l.username = :OLD.username;
+    --espacio
+    -- Confirmar los cambios
+    COMMIT;
+    --espacio
+    -- Mostrar un mensaje de éxito
+    DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anónimas exitosamente.');
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Manejar cualquier error que pueda ocurrir durante el proceso
+        DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
+        ROLLBACK; -- Deshacer cualquier cambio en caso de error
+END TrasladarComprasAnonimas;
+/
+
+drop trigger TrasladarComprasAnonimas;
+CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
+AFTER DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country, barcode, price, quantity, pay_type, pay_datetime, card_comp, card_num, card_holder, card_expir
+    )
+    SELECT
+        cl.orderdate, cl.username, ca.town, ca.country, cl.barcode, cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cc.card_comp, cl.cardnum, cc.card_holder, cc.card_expir
+    FROM
+        Client_Lines cl
+    JOIN
+        Client_Addresses ca ON cl.username = ca.username AND cl.town = ca.town AND cl.country = ca.country
+    JOIN
+        Client_Cards cc ON cl.username = cc.username AND cl.cardnum = cc.cardnum
+    WHERE
+        cl.username = :OLD.username;
 
     -- Confirmar los cambios
     COMMIT;
-    
+
     -- Mostrar un mensaje de éxito
     DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anónimas exitosamente.');
 EXCEPTION
