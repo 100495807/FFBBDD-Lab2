@@ -141,12 +141,12 @@ WHERE username = user_pkg.current_user;
 
 -- insertar comentarios -- 
 CREATE OR REPLACE TRIGGER insert_comentario_trigger
-BEFORE INSERT ON mis_comentarios
+BEFORE INSERT ON Posts_aux
 FOR EACH ROW
 BEGIN
-  IF :NEW.likes > 0 THEN
-    RAISE_APPLICATION_ERROR(-20001, 'No se pueden insertar comentarios con "likes" mayores que cero.');
-  END IF;
+    IF :NEW.likes > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se pueden insertar comentarios con "likes" mayores que cero.');
+    END IF;
 END;
 /
 
