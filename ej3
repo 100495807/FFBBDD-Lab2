@@ -6,66 +6,22 @@ END user_pkg;
 CREATE OR REPLACE PACKAGE BODY user_pkg AS
   FUNCTION current_user RETURN VARCHAR2 IS
   BEGIN
-    RETURN USER;
+    RETURN 'gh';
   END current_user;
 END user_pkg;
 /
-
+select user_pkg.current_user from dual;
 
 -- 1 --
-CREATE TABLE aux (
-  orderdate     DATE,
-  username      VARCHAR2(30),
-  town          VARCHAR2(45),
-  country       VARCHAR2(45),
-  barcode       CHAR(15),
-  price         NUMBER(12,2) NOT NULL,
-  quantity      VARCHAR2(2) NOT NULL,
-  pay_type      VARCHAR2(15) NOT NULL,
-  pay_datetime  DATE,
-  cardnum       NUMBER(20)
-);
-
-INSERT INTO aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
-VALUES 
-  (TO_DATE('2024-04-07', 'YYYY-MM-DD'), 'fsdb180', 'Ciudad1', 'País1', 'IIO36995I795578', 10.99, '1', 'Efectivo', TO_DATE('2024-04-07', 'YYYY-MM-DD'), NULL);
-
-SELECT user_pkg.current_user FROM DUAL;
-
 CREATE OR REPLACE VIEW Mis_compras AS
 SELECT orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime
-FROM aux
+FROM Client_Lines
 WHERE username = user_pkg.current_user;
 
 select * from Mis_compras;
 
 
--- 2 --
-CREATE TABLE Clients_aux AS
-SELECT username, name, surn1, surn2, email, mobile
-FROM Clients;
-
-CREATE TABLE Client_Addresses_aux AS
-SELECT username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
-FROM Client_Addresses;
-
-CREATE TABLE Client_Cards_aux AS
-SELECT username, cardnum, card_comp, card_holder, card_expir
-FROM Client_Cards;
-
--- Para Clients_aux
-INSERT INTO Clients_aux (username, name, surn1, surn2, email, mobile)
-VALUES ('FSDB180', 'Nombre1', 'Apellido1', 'Apellido2', 'correo1@example.com', 123456789);
-       
--- Para Client_Addresses_aux
-INSERT INTO Client_Addresses_aux (username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country)
-VALUES ('FSDB180', 'Calle', 'Calle Principal', '1', 'A', '2', '3', 'P4', '28001', 'Madrid', 'España');
-       
--- Para Client_Cards_aux
-INSERT INTO Client_Cards_aux (username, cardnum, card_comp, card_holder, card_expir)
-VALUES ('FSDB180', 1234567890123456, 'VISA', 'Titular Tarjeta 1', TO_DATE('31-12-2024', 'DD-MM-YYYY'));
-       
-
+-- 2 --       
 CREATE OR REPLACE VIEW Mi_perfil AS
 SELECT c.username,
        c.name,
@@ -87,9 +43,9 @@ SELECT c.username,
        cc.card_comp,
        cc.card_holder,
        cc.card_expir
-FROM Clients_aux c
-LEFT JOIN Client_Addresses_aux ca ON c.username = ca.username
-LEFT JOIN Client_Cards_aux cc ON c.username = cc.username
+FROM Clients c
+LEFT JOIN Client_Addresses ca ON c.username = ca.username
+LEFT JOIN Client_Cards cc ON c.username = cc.username
 WHERE c.username = user_pkg.current_user;
 
 
@@ -97,51 +53,14 @@ select * from Mi_perfil;
 
 
 -- 3 --
-CREATE TABLE Posts_aux (
-  username   VARCHAR2(30),
-  postdate   DATE,
-  barCode    CHAR(15),
-  product    VARCHAR2(50) NOT NULL,
-  score      NUMBER(1) NOT NULL, 
-  title      VARCHAR2(50),
-  text       VARCHAR2(2000) NOT NULL, 
-  likes      NUMBER(9) DEFAULT(0) NOT NULL, 
-  endorsed   DATE
-);
-
-INSERT INTO Posts_aux (username, postdate, barCode, product, score, title, text, likes, endorsed)
-VALUES (
-    'FSDB180',
-    TO_DATE('2024-04-06', 'YYYY-MM-DD'),
-    '123456789012345',
-    'Coffee Beans',
-    5,
-    'Great Coffee Beans',
-    'These coffee beans are of excellent quality. I highly recommend them!',
-    10,
-    NULL
-);
-INSERT INTO Posts_aux (username, postdate, barCode, product, score, title, text, likes, endorsed)
-VALUES (
-    'FSDB180',
-    TO_DATE('2024-04-07', 'YYYY-MM-DD'),
-    '123456789012345',
-    'Coffee Beans',
-    5,
-    'Great Coffee Beans',
-    'These coffee beans are of excellent quality. I highly recommend them!',
-    0,
-    NULL
-);
-
 CREATE OR REPLACE VIEW mis_comentarios AS
 SELECT username, postdate, barcode, product, score, title, likes, endorsed, text
-FROM Posts_aux
+FROM Posts
 WHERE username = user_pkg.current_user;
 
 -- insertar comentarios -- 
 CREATE OR REPLACE TRIGGER insert_comentario_trigger
-BEFORE INSERT ON Posts_aux
+BEFORE INSERT ON Posts
 FOR EACH ROW
 BEGIN
     IF :NEW.likes > 0 THEN
@@ -152,7 +71,7 @@ END;
 
 -- Actualizar comentarios --
 CREATE OR REPLACE TRIGGER update_comentario_trigger
-BEFORE UPDATE ON Posts_aux
+BEFORE UPDATE ON Posts
 FOR EACH ROW
 BEGIN
   IF :OLD.likes > 0 THEN
@@ -163,7 +82,7 @@ END;
 
 -- Eliminar comentarios --
 CREATE OR REPLACE TRIGGER delete_comentario_trigger
-BEFORE DELETE ON Posts_aux
+BEFORE DELETE ON Posts
 FOR EACH ROW
 BEGIN
   IF :OLD.likes > 0 THEN
@@ -172,25 +91,35 @@ BEGIN
 END;
 /
 
-
 select * from mis_comentarios;
 
--- Error al eliminar el comentario existente
-DELETE FROM mis_comentarios
-WHERE postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
 
 -- Error al introducir el comentario
 INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
-VALUES (user_pkg.current_user, SYSDATE, 'barCode', 'producto', 5, 'título', 'Nuevo texto del comentario', 7, NULL);
+VALUES (user_pkg.current_user, SYSDATE, 'IQO47507I223966', 'Lirios o manana', 5, 'titulo', 'Nuevo texto del comentario', 7, NULL);
+
+-- Introducir el comentario
+INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
+VALUES (user_pkg.current_user, SYSDATE, 'IQO47507I223966', 'Lirios o manana', 5, 'titulo', 'Nuevo texto del comentario', 0, NULL);
+
 
 -- Error al actualizar el comentario
-UPDATE Posts_aux
+UPDATE mis_comentarios
 SET text = 'Este es el nuevo texto del comentario'
-WHERE username = user_pkg.current_user  -- Usuario del comentario
-AND postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
+WHERE title = 'ZQVrkeOr';
 
 -- Actualizar el comentario
-UPDATE Posts_aux
+UPDATE mis_comentarios
 SET text = 'Este es el nuevo texto del comentario'
-WHERE username = user_pkg.current_user  -- Usuario del comentario
-AND postdate = TO_DATE('2024-04-07', 'YYYY-MM-DD');
+WHERE title = 'titulo';
+
+
+-- Error al eliminar el comentario existente
+DELETE FROM mis_comentarios
+WHERE title = 'ZQVrkeOr';
+
+-- Eliminar el comentario existente
+DELETE FROM mis_comentarios
+WHERE title = 'titulo';
+
+
