@@ -1,0 +1,21 @@
+CREATE OR REPLACE TRIGGER update_endorsed
+BEFORE INSERT OR UPDATE ON Posts
+FOR EACH ROW
+DECLARE
+    v_endorsed_date DATE;
+BEGIN
+    -- Verificar si el usuario ha comprado el producto o referencia anteriormente
+    SELECT MAX(endorsed) INTO v_endorsed_date
+    FROM Posts
+    WHERE username = :NEW.username
+    AND barCode = :NEW.barCode
+    AND product = :NEW.product;
+
+    -- Actualizar el valor de 'endorsed' en función de si el usuario ha comprado el producto o referencia anteriormente
+    IF v_endorsed_date IS NOT NULL THEN
+        :NEW.endorsed := 'Y';
+    ELSE
+        :NEW.endorsed := 'N';
+    END IF;
+END;
+/
