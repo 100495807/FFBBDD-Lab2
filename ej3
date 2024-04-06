@@ -11,14 +11,60 @@ CREATE OR REPLACE PACKAGE BODY user_pkg AS
 END user_pkg;
 /
 
+
+-- 1 --
+CREATE TABLE aux (
+  orderdate     DATE,
+  username      VARCHAR2(30),
+  town          VARCHAR2(45),
+  country       VARCHAR2(45),
+  barcode       CHAR(15),
+  price         NUMBER(12,2) NOT NULL,
+  quantity      VARCHAR2(2) NOT NULL,
+  pay_type      VARCHAR2(15) NOT NULL,
+  pay_datetime  DATE,
+  cardnum       NUMBER(20)
+);
+
+INSERT INTO aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES 
+  (TO_DATE('2024-04-07', 'YYYY-MM-DD'), 'fsdb180', 'Ciudad1', 'País1', 'IIO36995I795578', 10.99, '1', 'Efectivo', TO_DATE('2024-04-07', 'YYYY-MM-DD'), NULL);
+
+SELECT user_pkg.current_user FROM DUAL;
+
 CREATE OR REPLACE VIEW Mis_compras AS
 SELECT orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime
 FROM aux
 WHERE username = user_pkg.current_user;
 
-
 select * from Mis_compras;
 
+
+-- 2 --
+CREATE TABLE Clients_aux AS
+SELECT username, name, surn1, surn2, email, mobile
+FROM Clients;
+
+CREATE TABLE Client_Addresses_aux AS
+SELECT username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
+FROM Client_Addresses;
+
+CREATE TABLE Client_Cards_aux AS
+SELECT username, cardnum, card_comp, card_holder, card_expir
+FROM Client_Cards;
+
+-- Para Clients_aux
+INSERT INTO Clients_aux (username, name, surn1, surn2, email, mobile)
+VALUES ('FSDB180', 'Nombre1', 'Apellido1', 'Apellido2', 'correo1@example.com', 123456789);
+       
+-- Para Client_Addresses_aux
+INSERT INTO Client_Addresses_aux (username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country)
+VALUES ('FSDB180', 'Calle', 'Calle Principal', '1', 'A', '2', '3', 'P4', '28001', 'Madrid', 'España');
+       
+-- Para Client_Cards_aux
+INSERT INTO Client_Cards_aux (username, cardnum, card_comp, card_holder, card_expir)
+VALUES ('FSDB180', 1234567890123456, 'VISA', 'Titular Tarjeta 1', TO_DATE('31-12-2024', 'DD-MM-YYYY'));
+       
 
 CREATE OR REPLACE VIEW Mi_perfil AS
 SELECT c.username,
@@ -41,6 +87,10 @@ SELECT c.username,
        cc.card_comp,
        cc.card_holder,
        cc.card_expir
-FROM Clients c
-LEFT JOIN Client_Addresses ca ON c.username = ca.username
-LEFT JOIN Client_Cards cc ON c.username = cc.username;
+FROM Clients_aux c
+LEFT JOIN Client_Addresses_aux ca ON c.username = ca.username
+LEFT JOIN Client_Cards_aux cc ON c.username = cc.username
+WHERE c.username = user_pkg.current_user;
+
+
+select * from Mi_perfil;
