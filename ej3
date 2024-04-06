@@ -135,7 +135,7 @@ VALUES (
 );
 
 CREATE OR REPLACE VIEW mis_comentarios AS
-SELECT *
+SELECT username, postdate, barcode, product, score, title, likes, endorsed, text
 FROM Posts_aux
 WHERE username = user_pkg.current_user;
 
