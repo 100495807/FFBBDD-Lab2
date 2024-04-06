@@ -1,0 +1,46 @@
+CREATE OR REPLACE PACKAGE user_pkg AS
+  FUNCTION current_user RETURN VARCHAR2;
+END user_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY user_pkg AS
+  FUNCTION current_user RETURN VARCHAR2 IS
+  BEGIN
+    RETURN USER;
+  END current_user;
+END user_pkg;
+/
+
+CREATE OR REPLACE VIEW Mis_compras AS
+SELECT orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime
+FROM aux
+WHERE username = user_pkg.current_user;
+
+
+select * from Mis_compras;
+
+
+CREATE OR REPLACE VIEW Mi_perfil AS
+SELECT c.username,
+       c.name,
+       c.surn1,
+       c.surn2,
+       c.email,
+       c.mobile,
+       ca.waytype AS address_waytype,
+       ca.wayname AS address_wayname,
+       ca.gate AS address_gate,
+       ca.block AS address_block,
+       ca.stairw AS address_stairw,
+       ca.floor AS address_floor,
+       ca.door AS address_door,
+       ca.ZIP AS address_ZIP,
+       ca.town AS address_town,
+       ca.country AS address_country,
+       cc.cardnum,
+       cc.card_comp,
+       cc.card_holder,
+       cc.card_expir
+FROM Clients c
+LEFT JOIN Client_Addresses ca ON c.username = ca.username
+LEFT JOIN Client_Cards cc ON c.username = cc.username;
