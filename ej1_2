@@ -35,7 +35,7 @@ total_pedidos AS (
 pedidos_con_mes AS (
     SELECT  username, barcode, price, quantity, country, varietal, TO_CHAR(orderdate, 'YY/MM') AS mes
     FROM total_pedidos
-),
+),/*
 --supuesto semantico implicito si se repiten barcodes se coge el primero
 ped_con_costes AS (
     SELECT 
@@ -43,6 +43,15 @@ ped_con_costes AS (
       (SELECT cost FROM Supply_Lines s WHERE s.barcode = p.barcode AND ROWNUM = 1) AS cost
     FROM
       pedidos_con_mes p
+),*/
+--suspuesto semantico implito si aparecen varias veces el mismo barcode pero tienen 
+--distintos costes se cogera el coste mas alto para asi no subestimas beneficios
+ped_con_costes AS (
+    SELECT 
+      p.username, p.barcode, p.price, p.quantity, p.country, p.varietal, p.mes, MAX(s.cost) AS cost
+    FROM pedidos_con_mes p
+    JOIN Supply_Lines s ON p.barcode = s.barcode
+    GROUP BY p.username, p.barcode, p.price, p.quantity, p.country, p.varietal, p.mes
 ),
 barcode_mas_vendido_por_mes AS (
     SELECT mes, barcode, count(*) as veces_vendido ,ROW_NUMBER() OVER (PARTITION BY mes ORDER BY COUNT(*) DESC) AS mas_vendido,
@@ -122,3 +131,23 @@ barcode_mas_vendido as (
 	WHERE mas_vendido = 1
 	ORDER BY mes)
 select * from barcode_mas_vendido;
+--def
+
+
+MES   BARCODE         VECES_VENDIDO UNIDADES_VENDIDAS INGRESOS_TOTALES BENEFICIO_TOTAL
+----- --------------- ------------- ----------------- ---------------- ---------------
+23/04 III90803O667181             4                25          1618,75          178,25
+23/05 QQO38253Q726584             4                32           1556,8          186,88
+23/06 OII22831Q738220             4                44            987,8           118,8
+23/07 OOO20922Q723370             4                51           430,95           52,02
+23/08 OOO68757I566970             4                56           388,08            39,2
+23/09 QIQ57145Q641987             4                31           2058,4          226,61
+23/10 QIO96770Q227716             6                97            62,08            7,76
+23/11 OII31978O673570             3                12             34,2            4,56
+23/12 QQQ45124O782773             4                54           376,92            37,8
+24/01 OIO78417I439107             4                18             60,3            6,12
+24/02 IOQ99766Q427991             4                37            18,13            2,22
+
+MES   BARCODE         VECES_VENDIDO UNIDADES_VENDIDAS INGRESOS_TOTALES BENEFICIO_TOTAL
+----- --------------- ------------- ----------------- ---------------- ---------------
+24/03 IOI86584I705567             2                25              220              22
