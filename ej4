@@ -85,33 +85,150 @@ select * from aux_posts;
 
 --2--
 drop trigger TrasladarComprasAnonimas;
-DROP TABLE temp_client_posts;
+drop table temp_clients;
 
-CREATE GLOBAL TEMPORARY TABLE temp_client_posts (
-    username VARCHAR2(30),
-    postdate DATE,
-    barCode CHAR(15),
-    product VARCHAR2(100),
-    score NUMBER,
-    title VARCHAR2(100),
-    text VARCHAR2(4000),
-    likes NUMBER,
-    endorsed date
-) ON COMMIT PRESERVE ROWS;
+CREATE GLOBAL TEMPORARY TABLE temp_clients (
+    username      VARCHAR2(30),
+    reg_datetime  DATE,
+    user_passw    VARCHAR2(15),
+    name          VARCHAR2(35),
+    surn1         VARCHAR2(30),
+    surn2         VARCHAR2(30),
+    email         VARCHAR2(60),
+    mobile        NUMBER(9),
+    preference    VARCHAR2(12),
+    voucher       NUMBER(2),
+    voucher_exp   DATE
+) ON COMMIT DELETE ROWS;
 
-CREATE OR REPLACE TRIGGER BeforeDeleteClient
+CREATE OR REPLACE TRIGGER Fill_Temp_Clients
 BEFORE DELETE ON Clients
 FOR EACH ROW
 BEGIN
-    INSERT INTO temp_client_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
-    SELECT p.username, p.postdate, p.barCode, p.product, p.score, p.title, p.text, p.likes, p.endorsed
-    FROM Posts p
-    WHERE p.username = :OLD.username;
-END BeforeDeleteClient;
+    INSERT INTO temp_clients VALUES (
+        :OLD.username, :OLD.reg_datetime, :OLD.user_passw,
+        :OLD.name, :OLD.surn1, :OLD.surn2,
+        :OLD.email, :OLD.mobile, :OLD.preference,
+        :OLD.voucher, :OLD.voucher_exp
+    );
+END Fill_Temp_Clients;
+/
+
+
+CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
+BEFORE DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    -- Eliminar los posts relacionados con el cliente
+    DELETE FROM Posts WHERE username = :OLD.username;
+
+    -- Eliminar los registros relacionados en la tabla Orders_Clients
+    DELETE FROM Orders_Clients WHERE username = :OLD.username;
+
+    -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, dliv_datetime, name, surn1, surn2, 
+        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate, oc.username, oc.dliv_datetime, c.name, c.surn1, c.surn2,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, ca.town, ca.country,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, ca.town, ca.country
+    FROM 
+        Orders_Clients oc
+    JOIN
+        Clients c ON oc.username = c.username
+    JOIN
+        Client_Addresses ca ON oc.username = ca.username
+    WHERE 
+        oc.username = :OLD.username;
+        
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country, 
+        barcode, price, quantity, pay_type, pay_datetime, 
+        card_comp, card_num, card_holder, card_expir
+    )
+    SELECT
+        cl.orderdate, cl.username, ca.town, ca.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cc.card_comp, 
+        cl.cardnum, cc.card_holder, cc.card_expir
+    FROM
+        Client_Lines cl
+    JOIN
+        Client_Addresses ca ON cl.username = ca.username AND cl.town = ca.town AND cl.country = ca.country
+    JOIN
+        Client_Cards cc ON cl.username = cc.username AND cl.cardnum = cc.cardnum
+    WHERE
+        cl.username = :OLD.username;
+    
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT 
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM 
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    -- Confirmar los cambios
+    COMMIT;
+    -- Mostrar un mensaje de éxito
+    DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anonimas exitosamente.');
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Manejar cualquier error que pueda ocurrir durante el proceso
+        DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
+END TrasladarComprasAnonimas;
+/
+
+
+
+DELETE FROM Clients WHERE username = 'chavela';
+
+/*
+drop table temp_clients;
+
+CREATE GLOBAL TEMPORARY TABLE temp_clients (
+    username      VARCHAR2(30),
+    reg_datetime  DATE,
+    user_passw    VARCHAR2(15),
+    name          VARCHAR2(35),
+    surn1         VARCHAR2(30),
+    surn2         VARCHAR2(30),
+    email         VARCHAR2(60),
+    mobile        NUMBER(9),
+    preference    VARCHAR2(12),
+    voucher       NUMBER(2),
+    voucher_exp   DATE
+) ON COMMIT DELETE ROWS;
+
+CREATE OR REPLACE TRIGGER Fill_Client_Data
+BEFORE DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    -- Insertar datos del cliente en la tabla temporal
+    INSERT INTO temp_clients (
+        username, reg_datetime, user_passw, name, surn1, surn2, email, mobile, preference, voucher, voucher_exp
+    )
+    SELECT
+        username, reg_datetime, user_passw, name, surn1, surn2, email, mobile, preference, voucher, voucher_exp
+    FROM
+        Clients
+    WHERE
+        username = :OLD.username;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        NULL; -- No hacer nada si no se encuentran datos
+    WHEN OTHERS THEN
+        -- Manejar cualquier otro error que pueda ocurrir durante el proceso
+        DBMS_OUTPUT.PUT_LINE('Error al rellenar la tabla temporal: ' || SQLERRM);
+END Fill_Client_Data;
 /
 
 CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
-BEFORE /*o after duda de mejora*/ DELETE ON Clients
+AFTER /*o after duda de mejora*/ DELETE ON Clients
 FOR EACH ROW
 BEGIN
     -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
@@ -171,7 +288,7 @@ EXCEPTION
         DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
 END TrasladarComprasAnonimas;
 /
-
+*/
 
 DELETE FROM Clients WHERE username = 'chavela';
 
