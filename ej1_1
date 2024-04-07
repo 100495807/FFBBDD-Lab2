@@ -66,12 +66,15 @@ total_compradores AS (
 paises_consumidores AS (
     SELECT varietal, COUNT(DISTINCT country) AS paises_consumidores_potenciales
     FROM (
-        SELECT country, varietal, SUM(quantity) AS total_unidades_vendidas
-        FROM total_pedidos
-        GROUP BY country, varietal
-    )
-    WHERE total_unidades_vendidas > (
-        SELECT SUM(quantity) * 0.01 FROM total_pedidos
+        SELECT t.varietal, t.country, 
+               SUM(t.quantity) AS total_unidades_country
+        FROM total_pedidos t
+        GROUP BY t.varietal, t.country
+    ) subquery
+    WHERE total_unidades_country > 0.01 * (
+        SELECT SUM(quantity) 
+        FROM total_pedidos 
+        WHERE varietal = subquery.varietal
     )
     GROUP BY varietal
 ),
