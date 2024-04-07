@@ -9,7 +9,7 @@ CREATE OR REPLACE PACKAGE BODY caffeine AS
     -- Procedimiento para convertir borradores de pedidos en pedidos confirmados
     PROCEDURE Set_Replacement_Orders IS
     BEGIN
-        -- Actualizar el puto estado de los pedidos borradores a pedidos confirmados profe mdhp
+        -- Actualizar el estado de los pedidos borradores a pedidos confirmados
         UPDATE Replacements
         SET status = 'P' -- 'P'  representa el estado de "confirmado"
         WHERE status = 'D'; -- 'D' representa el estado de "borrador";
@@ -19,12 +19,62 @@ CREATE OR REPLACE PACKAGE BODY caffeine AS
             dbms_output.put_line('No hay datos');
     END Set_Replacement_Orders;
 
-    PROCEDURE Informe_Proveedor(CIF  Char(10)) IS
-    confirmados NUMBER
-    BEGIN  
-        select count('x') into confirmados from (Replacements where status = 'P' 
-        and orderdate> SYSDATE- 365)
+    PROCEDURE Informe_Proveedor(CIF IN CHAR) IS
+    confirmados NUMBER; --Número de pedidos confirmados
+    media_tiempo_entrega NUMBER;
+    BEGIN
+        -- Calcular el número de pedidos confirmados en el último año para el proveedor especificado
+        SELECT COUNT(*) INTO confirmados FROM Replacements WHERE taxID = CIF AND status = 'P'AND orderdate > SYSDATE - 365;
 
+        -- Mostrar el número de pedidos confirmados
+        dbms_output.put_line('Número de pedidos confirmados en el último año: ' || confirmados);
+
+        -- Calcular el promedio del tiempo de entrega para los pedidos confirmados
+        SELECT AVG(deldate - orderdate)INTO media_tiempo_entrega
+        FROM Replacements WHERE taxID = CIFAND status = 'P'AND deldate IS NOT NULL AND orderdate > SYSDATE - 365;
+
+        -- Mostrar el promedio del tiempo de entrega
+        dbms_output.put_line('Promedio del tiempo de entrega para pedidos confirmados: ' || media_tiempo_entrega || ' días');
+
+        -- Obtener el detalle de las ofertas del proveedor
+        FOR offer IN (SELECT barCode,
+                            MAX(payment) KEEP (DENSE_RANK FIRST ORDER BY payment DESC) AS best_offer,
+                            MAX(payment) KEEP (DENSE_RANK SECOND ORDER BY payment DESC) AS second_best_offer,
+                            MIN(payment) AS min_offer,
+                            MAX(payment) AS max_offer,
+                            AVG(payment) OVER() AS avg_payment
+                    FROM Replacements
+                    WHERE taxID = CIF
+                    AND orderdate > SYSDATE - 365
+                    GROUP BY barCode)
+        LOOP
+            -- Calcular la diferencia del coste actual respecto al promedio de costes de todas las ofertas para esa referencia
+            DECLARE
+                cost_difference NUMBER;
+            BEGIN
+                cost_difference := offer.max_offer - offer.avg_payment;
+            END;
+
+            -- Calcular la diferencia del coste actual respecto a la mejor oferta para el producto
+            DECLARE
+                best_offer_difference NUMBER;
+            BEGIN
+                best_offer_difference := offer.max_offer - offer.best_offer;
+            END;
+
+            -- Mostrar el detalle de la oferta
+            dbms_output.put_line('Referencia: ' || offer.barCode ||
+                                ', Coste actual: ' || offer.max_offer ||
+                                ', Coste mínimo: ' || offer.min_offer ||
+                                ', Coste máximo: ' || offer.max_offer ||
+                                ', Diferencia del coste actual respecto al promedio: ' || cost_difference ||
+                                ', Diferencia del coste actual respecto a la mejor oferta: ' || best_offer_difference);
+        END LOOP;
+
+    EXCEPTION
+        WHEN no_data_found THEN 
+            dbms_output.put_line('No hay datos para generar el informe.');
+    END Informe_Proveedor;
 
 END caffeine;
 /
