@@ -2,3 +2,4 @@
 ejercicio 1.2 ped_con_coste
 supuesto semantico implicito si se repiten barcodes se coge el primero
 */
+-- supuesto semantico direcciones de pago y envio se toman las mismas (direccion de envio)
