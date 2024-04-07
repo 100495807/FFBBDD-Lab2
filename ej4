@@ -1,22 +1,26 @@
-CREATE OR REPLACE TRIGGER update_endorsed
+ALTER TABLE aux_posts MODIFY endorsed VARCHAR(1);
+
+CREATE OR REPLACE TRIGGER update_endorsed_trigger
 BEFORE INSERT OR UPDATE ON aux_posts
 FOR EACH ROW
 DECLARE
-    v_endorsed_date DATE;
+    v_endorsed VARCHAR2(1);
 BEGIN
-    -- Verificar si el usuario ha comprado el producto o referencia anteriormente
-    SELECT MAX(endorsed) INTO v_endorsed_date
-    FROM Posts
-    WHERE username = :NEW.username
-    AND barCode = :NEW.barCode
-    AND product = :NEW.product;
-
-    -- Actualizar el valor de 'endorsed' en función de si el usuario ha comprado el producto o referencia anteriormente
-    IF v_endorsed_date IS NOT NULL THEN
-        :NEW.endorsed := 'Y';
-    ELSE
-        :NEW.endorsed := 'N';
-    END IF;
+    -- Verificar si el usuario ha comprado el producto o referencia
+    SELECT CASE 
+               WHEN EXISTS (
+                  SELECT 1
+                  FROM Client_Lines
+                  WHERE username = :NEW.username
+                  AND barcode = :NEW.barcode
+               )
+               THEN 'Y'
+               ELSE 'N'
+           END
+    INTO v_endorsed
+    FROM dual;
+    -- Actualizar el atributo "endorsed"
+    :NEW.endorsed := v_endorsed;
 END;
 /
 
@@ -35,9 +39,9 @@ CREATE TABLE aux_posts (
 
 INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
 VALUES (
-    'FSDB180',
+    'gh',
     TO_DATE('2024-04-06', 'YYYY-MM-DD'),
-    '123456789012345',
+    'QOI51664Q397180',
     'Coffee Beans',
     5,
     'Great Coffee Beans',
@@ -47,7 +51,7 @@ VALUES (
 );
 INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
 VALUES (
-    'FSDB180',
+    'gh',
     TO_DATE('2024-04-07', 'YYYY-MM-DD'),
     '123456789012345',
     'Coffee Beans',
@@ -59,7 +63,7 @@ VALUES (
 );
 INSERT INTO aux_posts (username, postdate, barCode, product, score, title, text, likes, endorsed)
 VALUES (
-    'FSDB180',
+    'gh',
     TO_DATE('2024-04-09', 'YYYY-MM-DD'),
     '123456789012345',
     'Coffee Beans',
@@ -67,44 +71,42 @@ VALUES (
     'Great Coffee Beans',
     'These coffee beans are of excellent quality. I highly recommend them!',
     0,
-    TO_DATE('2024-04-09', 'YYYY-MM-DD')
+    NULL
 );
 
 
-UPDATE mis_comentarios
-SET text = 'Este es el nuevo texto del comentario'
-WHERE title = 'ZQVrkeOr';
+UPDATE aux_posts
+SET text = 'Nuevo texto del comentario'
+WHERE username = user_pkg.current_user
+AND barcode = '123456789012345'
+AND postdate = TO_DATE('2024-04-07', 'YYYY-MM-DD');
 
-
+select * from aux_posts;
 
 --2--
 
 CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
 AFTER DELETE ON Clients
 FOR EACH ROW
+DECLARE
 BEGIN
     -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
     INSERT INTO Orders_Anonym (
-        orderdate, contact, dliv_datetime,
-        name, surn1,
+        orderdate, contact, dliv_datetime, 
+        name, surn1, surn2, 
         bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
-        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town
     )
-    SELECT
-        l.orderdate, :OLD.username,  l.dliv_datetime,
-        :OLD.username,:OLD.username
-        c.waytype, c.wayname, c.gate, c.block, c.stairw, c.floor, c.door, c.ZIP, c.town, c.country,
-        c.waytype, c.wayname, c.gate, c.block, c.stairw, c.floor, c.door, c.ZIP, c.town, c.country
-    FROM
-        Client_Lines l
-    JOIN
-        Client_Addresses c ON l.username = c.username AND l.town = c.town AND l.country = c.country
-    WHERE
-        l.username = :OLD.username;
-    --espacio
+    SELECT 
+        orderdate, username, town, country, dliv_datetime, bill_town, bill_country, discount
+    FROM 
+        Orders_Clients
+    WHERE 
+        username = :OLD.username;
+
     -- Confirmar los cambios
     COMMIT;
-    --espacio
+    
     -- Mostrar un mensaje de éxito
     DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anónimas exitosamente.');
 EXCEPTION
@@ -115,36 +117,178 @@ EXCEPTION
 END TrasladarComprasAnonimas;
 /
 
-drop trigger TrasladarComprasAnonimas;
-CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
-AFTER DELETE ON Clients
+
+
+-- 3 --
+drop TRIGGER prevent_anonymous_purchase_trigger;
+CREATE OR REPLACE TRIGGER prevent_anonymous_purchase_trigger
+BEFORE INSERT ON Client_Lines_aux
 FOR EACH ROW
+DECLARE
+    v_username VARCHAR2(30);
 BEGIN
-    -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
-    INSERT INTO Lines_Anonym (
-        orderdate, contact, dliv_town, dliv_country, barcode, price, quantity, pay_type, pay_datetime, card_comp, card_num, card_holder, card_expir
-    )
-    SELECT
-        cl.orderdate, cl.username, ca.town, ca.country, cl.barcode, cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cc.card_comp, cl.cardnum, cc.card_holder, cc.card_expir
-    FROM
-        Client_Lines cl
-    JOIN
-        Client_Addresses ca ON cl.username = ca.username AND cl.town = ca.town AND cl.country = ca.country
-    JOIN
-        Client_Cards cc ON cl.username = cc.username AND cl.cardnum = cc.cardnum
-    WHERE
-        cl.username = :OLD.username;
-
-    -- Confirmar los cambios
-    COMMIT;
-
-    -- Mostrar un mensaje de éxito
-    DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anónimas exitosamente.');
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Manejar cualquier error que pueda ocurrir durante el proceso
-        DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
-        ROLLBACK; -- Deshacer cualquier cambio en caso de error
-END TrasladarComprasAnonimas;
+    -- Verificar si la compra es anónima
+    IF :NEW.username IS NULL THEN
+        -- Obtener el nombre de usuario asociado a la tarjeta de crédito utilizada en la compra anónima
+        BEGIN
+            SELECT username INTO v_username
+            FROM Client_Cards_aux
+            WHERE cardnum = :NEW.cardnum;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                v_username := NULL; -- No se encontró ningún registro, por lo que se asigna NULL a v_username
+        END;
+        
+        -- Si se encuentra un nombre de usuario, significa que la tarjeta de crédito ya está asociada a un usuario registrado
+        IF v_username IS NOT NULL THEN
+            -- Impedir la inserción de la compra anónima
+            RAISE_APPLICATION_ERROR(-20001, 'No se permite la inserción de compras anónimas utilizando una tarjeta de crédito ya almacenada por un usuario registrado.');
+        END IF;
+    END IF;
+END;
 /
 
+
+drop table client_lines_aux;
+CREATE TABLE client_lines_aux (
+  orderdate     DATE,
+  username      VARCHAR2(30),
+  town          VARCHAR2(45),
+  country       VARCHAR2(45),
+  barcode       CHAR(15),
+  price         NUMBER(12,2) NOT NULL,
+  quantity      VARCHAR2(2) NOT NULL,
+  pay_type      VARCHAR2(15) NOT NULL,
+  pay_datetime  DATE,
+  cardnum       NUMBER(20)
+);
+
+-- Tabla client_cards_aux
+drop table client_cards_aux;
+CREATE TABLE client_cards_aux (
+  cardnum      NUMBER(20),
+  username      VARCHAR2(30) NOT NULL,
+  card_comp     VARCHAR2(15) NOT NULL,
+  card_holder   VARCHAR2(30) NOT NULL,
+  card_expir    DATE NOT NULL
+);
+
+-- Insertar una tarjeta de crédito asociada a un usuario registrado
+INSERT INTO client_cards_aux (cardnum, username, card_comp, card_holder, card_expir)
+VALUES (1111222233334444, 'user1', 'Visa', 'Juan Perez', TO_DATE('2025-12-31', 'YYYY-MM-DD'));
+
+-- Intentar insertar una compra anónima utilizando una tarjeta de crédito asociada a un usuario registrado
+-- Debería generar un error ya que la tarjeta de crédito está asociada a 'user1'
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, NULL, 'Town', 'Country', '123456789012345', 20.50, '1', 'credit card', SYSDATE, 1111222233334444);
+
+-- Intentar insertar una compra anónima utilizando una tarjeta de crédito no asociada a ningún usuario
+-- Debería permitirse ya que la tarjeta de crédito no está asociada a ningún usuario registrado
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, NULL, 'Town', 'Country', '123456789012346', 30.75, '2', 'credit card', SYSDATE, 2222333344445555);
+
+-- Insertar una compra no anónima utilizando una tarjeta de crédito asociada a un usuario registrado
+-- Debería permitirse ya que la tarjeta de crédito está asociada a 'user1'
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, 'user1', 'Town', 'Country', '123456789012347', 15.25, '1', 'credit card', SYSDATE, 1111222233334444);
+
+
+select * from client_lines_aux;
+select * from client_cards_aux;
+
+
+-- 4 --
+drop TRIGGER update_stock_and_replenish_trigger;
+CREATE OR REPLACE TRIGGER update_stock_and_replenish_trigger
+AFTER INSERT ON Client_Lines_aux
+FOR EACH ROW
+DECLARE
+    v_current_stock NUMBER(10);
+    v_threshold NUMBER(10) := 10; -- Umbral de stock para generar pedido de reposición
+BEGIN
+    -- Obtener el stock actual del producto comprado
+    SELECT cur_stock INTO v_current_stock
+    FROM References_aux
+    WHERE barCode = :NEW.barcode;
+    
+    -- Actualizar el stock restando la cantidad comprada
+    UPDATE References_aux
+    SET cur_stock = cur_stock - TO_NUMBER(:NEW.quantity)
+    WHERE barCode = :NEW.barcode;
+    
+    -- Verificar si es necesario generar un pedido de reposición
+    IF v_current_stock - TO_NUMBER(:NEW.quantity) < v_threshold THEN
+        -- Insertar un nuevo pedido de reposición
+        INSERT INTO Replacements_aux (taxID, barCode, orderdate, status, units, payment)
+        VALUES ('ProvNuevo', :NEW.barcode, SYSDATE, 'D', v_threshold - (v_current_stock - TO_NUMBER(:NEW.quantity)), 0);
+    END IF;
+END;
+/
+
+
+drop table client_lines_aux;
+CREATE TABLE client_lines_aux (
+  orderdate     DATE,
+  username      VARCHAR2(30),
+  town          VARCHAR2(45),
+  country       VARCHAR2(45),
+  barcode       CHAR(15),
+  price         NUMBER(12,2) NOT NULL,
+  quantity      VARCHAR2(2) NOT NULL,
+  pay_type      VARCHAR2(15) NOT NULL,
+  pay_datetime  DATE,
+  cardnum       NUMBER(20)
+);
+
+
+drop table References_aux;
+CREATE TABLE References_aux (
+  barCode      CHAR(15),
+  product      VARCHAR2(50) NOT NULL,
+  format       CHAR(1) NOT NULL,
+  pack_type    VARCHAR2(10) NOT NULL,
+  pack_unit    VARCHAR2(10) NOT NULL,
+  quantity     NUMBER(6) NOT NULL,
+  price        NUMBER(12,2) NOT NULL,
+  cur_stock    NUMBER(5) DEFAULT(0) NOT NULL,
+  min_stock    NUMBER(5) DEFAULT(5) NOT NULL,
+  max_stock    NUMBER(5) DEFAULT(15) NOT NULL
+);
+
+drop table Replacements_aux;
+CREATE TABLE Replacements_aux (
+  taxID     CHAR(10),
+  barCode   CHAR(15),
+  orderdate DATE,
+  status    CHAR(1) DEFAULT ('D') NOT NULL,
+  units     NUMBER(5) NOT NULL,
+  deldate   DATE,
+  payment   NUMBER(12,2) NOT NULL
+);
+
+-- Insertar datos en la tabla References_aux
+INSERT INTO References_aux (barCode, product, format, pack_type, pack_unit, quantity, price, cur_stock, min_stock, max_stock)
+VALUES ('123456789012345', 'Product1', 'C', 'Box', 'Unit', 100, 10.50, 100, 5, 100);
+
+INSERT INTO References_aux (barCode, product, format, pack_type, pack_unit, quantity, price, cur_stock, min_stock, max_stock)
+VALUES ('543216789012345', 'Product2', 'G', 'Bag', 'Kg', 200, 15.75, 100, 10, 200);
+select * from References_aux;
+
+-- Insertar datos en la tabla client_lines_aux
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, 'user1', 'Town1', 'Country1', '123456789012345', 10.50, '95', 'cash', SYSDATE, NULL);
+
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, 'user2', 'Town2', 'Country2', '543216789012345', 15.75, '99', 'credit card', SYSDATE, 1111222233334444);
+select * from client_lines_aux;
+select * from References_aux;
+select * from Replacements_aux;
+
+-- Realizar una compra para probar el disparador
+INSERT INTO client_lines_aux (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
+VALUES (SYSDATE, 'user1', 'Town1', 'Country1', '123456789012345', 10.50, '5', 'cash', SYSDATE, NULL);
+
+
+select * from client_lines_aux;
+select * from References_aux;
+select * from Replacements_aux;
