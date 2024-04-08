@@ -1,3 +1,4 @@
+drop trigger update_endorsed_trigger;
 ALTER TABLE aux_posts MODIFY endorsed VARCHAR(1);
 
 CREATE OR REPLACE TRIGGER update_endorsed_trigger
@@ -189,6 +190,56 @@ END TrasladarComprasAnonimas;
 
 DELETE FROM Clients WHERE username = 'chavela';
 
+drop trigger chk_delete;
+
+
+
+--alberto 
+CREATE OR REPLACE TRIGGER chk_delete
+BEFORE DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT 
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM 
+        Posts
+    WHERE 
+        username = :OLD.username;
+
+    DELETE FROM 
+        Posts
+    WHERE 
+        username = :OLD.username;
+
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP, 
+        bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT 
+        oc.orderdate, 
+        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE  TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN :OLD.mobile END,
+        :OLD.name, :OLD.surn1, :OLD.surn2, 'NON', 'NON', 'NON',
+        oc.bill_town, oc.bill_country,  
+        'NON', 'NON', 'NON', oc.town, oc.country
+    FROM 
+        Orders_Clients oc
+    WHERE 
+        oc.username = :OLD.username;
+
+    DELETE FROM 
+        Orders_Clients
+    WHERE 
+        username = :OLD.username;
+END;
+/
+
+DELETE FROM Clients WHERE username = 'chavela';
+select * from AnonyPosts where title = 'OkYRBjV';
+select * from AnonyPosts where postdate = '04/07/15';
 
 -- 3 --
 drop TRIGGER prevent_anonymous_purchase_trigger;
