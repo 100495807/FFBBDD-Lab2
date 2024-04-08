@@ -86,160 +86,73 @@ select * from aux_posts;
 
 --2--
 drop trigger TrasladarComprasAnonimas;
-drop table temp_clients;
 
-CREATE GLOBAL TEMPORARY TABLE temp_clients (
-    username      VARCHAR2(30),
-    reg_datetime  DATE,
-    user_passw    VARCHAR2(15),
-    name          VARCHAR2(35),
-    surn1         VARCHAR2(30),
-    surn2         VARCHAR2(30),
-    email         VARCHAR2(60),
-    mobile        NUMBER(9),
-    preference    VARCHAR2(12),
-    voucher       NUMBER(2),
-    voucher_exp   DATE
-) ON COMMIT DELETE ROWS;
-
-CREATE OR REPLACE TRIGGER Fill_Temp_Clients
-BEFORE DELETE ON Clients
-FOR EACH ROW
-BEGIN
-    INSERT INTO temp_clients VALUES (
-        :OLD.username, :OLD.reg_datetime, :OLD.user_passw,
-        :OLD.name, :OLD.surn1, :OLD.surn2,
-        :OLD.email, :OLD.mobile, :OLD.preference,
-        :OLD.voucher, :OLD.voucher_exp
-    );
-END Fill_Temp_Clients;
-/
-
-
+-- dejando algo vacio orders_anonym
 CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
-BEFORE DELETE ON Clients
-FOR EACH ROW
-BEGIN
-    -- Verificar si el cliente está siendo eliminado
-    IF :OLD.username IS NOT NULL AND :NEW.username IS NULL THEN
-        -- Eliminar los posts relacionados con el cliente
-        DELETE FROM Posts WHERE username = :OLD.username;
-
-        -- Eliminar los registros relacionados en la tabla Orders_Clients
-        DELETE FROM Orders_Clients WHERE username = :OLD.username;
-        DELETE FROM Client_Addresses WHERE username = :OLD.username;
-
-        -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
-        INSERT INTO Orders_Anonym (
-            orderdate, contact, dliv_datetime, name, surn1, surn2, 
-            bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
-            dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
-        )
-        SELECT
-            oc.orderdate, oc.username, oc.dliv_datetime, c.name, c.surn1, c.surn2,
-            ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, ca.town, ca.country,
-            ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, ca.town, ca.country
-        FROM 
-            Orders_Clients oc
-        JOIN
-            Clients c ON oc.username = c.username
-        JOIN
-            Client_Addresses ca ON oc.username = ca.username
-        WHERE 
-            oc.username = :OLD.username;
-            
-        INSERT INTO Lines_Anonym (
-            orderdate, contact, dliv_town, dliv_country, 
-            barcode, price, quantity, pay_type, pay_datetime, 
-            card_comp, card_num, card_holder, card_expir
-        )
-        SELECT
-            cl.orderdate, cl.username, ca.town, ca.country, cl.barcode,
-            cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cc.card_comp, 
-            cl.cardnum, cc.card_holder, cc.card_expir
-        FROM
-            Client_Lines cl
-        JOIN
-            Client_Addresses ca ON cl.username = ca.username AND cl.town = ca.town AND cl.country = ca.country
-        JOIN
-            Client_Cards cc ON cl.username = cc.username AND cl.cardnum = cc.cardnum
-        WHERE
-            cl.username = :OLD.username;
-        
-        INSERT INTO AnonyPosts (
-            postdate, barCode, product, score, title, text, likes, endorsed
-        )
-        SELECT 
-            postdate, barCode, product, score, title, text, likes, endorsed
-        FROM 
-            Posts
-        WHERE
-            username = :OLD.username;
-
-        -- Confirmar los cambios
-        COMMIT;
-        -- Mostrar un mensaje de éxito
-        DBMS_OUTPUT.PUT_LINE('Compras del cliente trasladadas a compras anonimas exitosamente.');
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Manejar cualquier error que pueda ocurrir durante el proceso
-        DBMS_OUTPUT.PUT_LINE('Error al trasladar las compras a compras anónimas: ' || SQLERRM);
-END TrasladarComprasAnonimas;
-/
-
-DELETE FROM Clients WHERE username = 'chavela';
-
-drop trigger chk_delete;
-
-
-
---alberto 
-CREATE OR REPLACE TRIGGER chk_delete
 BEFORE DELETE ON Clients
 FOR EACH ROW
 BEGIN
     INSERT INTO AnonyPosts (
         postdate, barCode, product, score, title, text, likes, endorsed
     )
-    SELECT 
+    SELECT
         postdate, barCode, product, score, title, text, likes, endorsed
-    FROM 
+    FROM
         Posts
-    WHERE 
+    WHERE
         username = :OLD.username;
 
-    DELETE FROM 
+    DELETE FROM
         Posts
-    WHERE 
+    WHERE
         username = :OLD.username;
 
     INSERT INTO Orders_Anonym (
-        orderdate, contact, contact2, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP, 
+        orderdate, contact, contact2, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
         bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
     )
-    SELECT 
-        oc.orderdate, 
-        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE  TO_CHAR(:OLD.mobile) END,
-        CASE WHEN :OLD.email IS NULL THEN :OLD.mobile END,
-        :OLD.name, :OLD.surn1, :OLD.surn2, 'NON', 'NON', 'NON',
-        oc.bill_town, oc.bill_country,  
-        'NON', 'NON', 'NON', oc.town, oc.country
-    FROM 
+    SELECT
+        oc.orderdate,
+        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END,
+        :OLD.name, :OLD.surn1, :OLD.surn2, 'null', 'null', 'null',
+        oc.bill_town, oc.bill_country,
+        'nul', 'null', 'null', oc.town, oc.country
+    FROM
         Orders_Clients oc
-    WHERE 
+    WHERE
         oc.username = :OLD.username;
 
-    DELETE FROM 
+    DELETE FROM
         Orders_Clients
-    WHERE 
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country,
+        barcode, price, quantity, pay_type, pay_datetime, card_num
+    )
+    SELECT
+        cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        cl.town, cl.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+    FROM
+        Client_Lines cl
+    WHERE
+        cl.username = :OLD.username;
+
+    DELETE FROM
+        Client_Lines
+    WHERE
         username = :OLD.username;
 END;
 /
 
+
 DELETE FROM Clients WHERE username = 'chavela';
 select * from AnonyPosts where title = 'OkYRBjV';
-select * from AnonyPosts where postdate = '04/07/15';
+select * from orders_anonym where name = 'Pia Chavela';
+select * from lines_anonym where contact = '555977658';
 
 -- 3 --
 drop TRIGGER prevent_anonymous_purchase_trigger;
