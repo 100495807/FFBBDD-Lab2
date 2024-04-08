@@ -1,7 +1,7 @@
 CREATE OR REPLACE PACKAGE caffeine AS
     -- Procedimiento para convertir borradores de pedidos en pedidos confirmados
     PROCEDURE Set_Replacement_Orders;
-    PROCEDURE Informe_Proveedor(taxID Char(10))
+    PROCEDURE Informe_Proveedor(CIF IN CHAR);
 END caffeine;
 /
 
@@ -20,55 +20,70 @@ CREATE OR REPLACE PACKAGE BODY caffeine AS
     END Set_Replacement_Orders;
 
     PROCEDURE Informe_Proveedor(CIF IN CHAR) IS
-    confirmados NUMBER; --Número de pedidos confirmados
-    media_tiempo_entrega NUMBER;
+        confirmados NUMBER;
+        avg_delivery_time NUMBER;
+        coste_actual NUMBER;
+        diferencia_costes NUMBER;
+
     BEGIN
         -- Calcular el número de pedidos confirmados en el último año para el proveedor especificado
-        SELECT COUNT(*) INTO confirmados FROM Replacements WHERE taxID = CIF AND status = 'P'AND orderdate > SYSDATE - 365;
+        SELECT COUNT(*)
+        INTO confirmados
+        FROM Replacements
+        WHERE taxID = CIF
+        AND status = 'P'
+        AND orderdate > SYSDATE - 365;
 
         -- Mostrar el número de pedidos confirmados
-        dbms_output.put_line('Número de pedidos confirmados en el último año: ' || confirmados);
+        dbms_output.put_line('Numero de pedidos confirmados en el ultimo anio: ' || confirmados);
 
         -- Calcular el promedio del tiempo de entrega para los pedidos confirmados
-        SELECT AVG(deldate - orderdate)INTO media_tiempo_entrega
-        FROM Replacements WHERE taxID = CIFAND status = 'P'AND deldate IS NOT NULL AND orderdate > SYSDATE - 365;
+        SELECT AVG(deldate - orderdate)
+        INTO avg_delivery_time
+        FROM Replacements
+        WHERE taxID = CIF
+        AND status = 'P'
+        AND deldate IS NOT NULL
+        AND orderdate > SYSDATE - 365;
 
         -- Mostrar el promedio del tiempo de entrega
-        dbms_output.put_line('Promedio del tiempo de entrega para pedidos confirmados: ' || media_tiempo_entrega || ' días');
+        dbms_output.put_line('Promedio del tiempo de entrega para pedidos confirmados: ' || avg_delivery_time || ' dias');
 
         -- Obtener el detalle de las ofertas del proveedor
-        FOR offer IN (SELECT barCode,
-                            MAX(payment) KEEP (DENSE_RANK FIRST ORDER BY payment DESC) AS best_offer,
-                            MAX(payment) KEEP (DENSE_RANK SECOND ORDER BY payment DESC) AS second_best_offer,
-                            MIN(payment) AS min_offer,
-                            MAX(payment) AS max_offer,
-                            AVG(payment) OVER() AS avg_payment
-                    FROM Replacements
-                    WHERE taxID = CIF
-                    AND orderdate > SYSDATE - 365
-                    GROUP BY barCode)
+        FOR oferta IN (SELECT barCode,
+                               MAX(cost) AS costo_maximo,
+                               MIN(cost) AS costo_minimo,
+                               AVG(cost) AS costo_promedio
+                        FROM Supply_Lines
+                        WHERE taxID = CIF
+                        GROUP BY barCode)
+
         LOOP
-            -- Calcular la diferencia del coste actual respecto al promedio de costes de todas las ofertas para esa referencia
-            DECLARE
-                cost_difference NUMBER;
+            -- Obtener el coste actual de la referencia
             BEGIN
-                cost_difference := offer.max_offer - offer.avg_payment;
-            END;
+                SELECT cost
+                INTO coste_actual
+                FROM Supply_Lines
+                WHERE taxID = CIF
+                AND barCode = oferta.barCode;
 
-            -- Calcular la diferencia del coste actual respecto a la mejor oferta para el producto
-            DECLARE
-                best_offer_difference NUMBER;
-            BEGIN
-                best_offer_difference := offer.max_offer - offer.best_offer;
-            END;
+                -- Calcular la diferencia del coste actual menos el promedio de costes de todas las ofertas
+                diferencia_costes := coste_actual - oferta.costo_promedio;
 
-            -- Mostrar el detalle de la oferta
-            dbms_output.put_line('Referencia: ' || offer.barCode ||
-                                ', Coste actual: ' || offer.max_offer ||
-                                ', Coste mínimo: ' || offer.min_offer ||
-                                ', Coste máximo: ' || offer.max_offer ||
-                                ', Diferencia del coste actual respecto al promedio: ' || cost_difference ||
-                                ', Diferencia del coste actual respecto a la mejor oferta: ' || best_offer_difference);
+                -- Mostrar el detalle de la oferta
+                dbms_output.put_line('Referencia: ' || oferta.barCode);
+                dbms_output.put_line('Coste actual: ' || coste_actual);
+                dbms_output.put_line('Coste mínimo durante el último año: ' || oferta.costo_minimo);
+                dbms_output.put_line('Coste máximo durante el último año: ' || oferta.costo_maximo);
+                dbms_output.put_line('Diferencia del coste actual menos el promedio de costes: ' || diferencia_costes);
+
+                -- Mostrar la diferencia con respecto a la mejor oferta para el producto
+                IF coste_actual = oferta.costo_minimo THEN
+                    dbms_output.put_line('El coste actual es el mejor precio para este producto.');
+                ELSE
+                    dbms_output.put_line('Diferencia con respecto a la mejor oferta: ' || (coste_actual - oferta.costo_minimo));
+                END IF;
+            END;
         END LOOP;
 
     EXCEPTION
@@ -79,3 +94,7 @@ CREATE OR REPLACE PACKAGE BODY caffeine AS
 END caffeine;
 /
 
+BEGIN
+    caffeine.Informe_Proveedor('E19951722G');
+END;
+/
