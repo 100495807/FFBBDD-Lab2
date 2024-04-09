@@ -35,15 +35,7 @@ total_pedidos AS (
 pedidos_con_mes AS (
     SELECT  username, barcode, price, quantity, country, varietal, TO_CHAR(orderdate, 'YY/MM') AS mes
     FROM total_pedidos
-),/*
---supuesto semantico implicito si se repiten barcodes se coge el primero
-ped_con_costes AS (
-    SELECT 
-      p.username, p.barcode, p.price, p.quantity, p.country, p.varietal, p.mes,
-      (SELECT cost FROM Supply_Lines s WHERE s.barcode = p.barcode AND ROWNUM = 1) AS cost
-    FROM
-      pedidos_con_mes p
-),*/
+),
 --suspuesto semantico implito si aparecen varias veces el mismo barcode pero tienen 
 --distintos costes se cogera el coste mas alto para asi no subestimas beneficios
 ped_con_costes AS (
@@ -60,10 +52,15 @@ barcode_mas_vendido_por_mes AS (
 	SUM((price - cost) * quantity) AS beneficio_total
     FROM ped_con_costes
     GROUP BY mes, barcode
+),
+business_way_of_life AS (
+	SELECT mes, barcode, veces_vendido, unidades_vendidas, ingresos_totales, beneficio_total
+	FROM barcode_mas_vendido_por_mes
+	WHERE mas_vendido = 1
 )
-SELECT mes, barcode, veces_vendido, unidades_vendidas, ingresos_totales, beneficio_total
-FROM barcode_mas_vendido_por_mes
-WHERE mas_vendido = 1;
+select * from business_way_of_life;
+
+
 
 
 
