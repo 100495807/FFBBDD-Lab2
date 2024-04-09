@@ -108,13 +108,13 @@ BEGIN
         username = :OLD.username;
 
     INSERT INTO Orders_Anonym (
-        orderdate, contact, contact2, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
+        orderdate, contact, contact2, dliv_datetime, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
         bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
     )
     SELECT
         oc.orderdate,
         CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
-        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END, oc.dliv_datetime,
         :OLD.name, :OLD.surn1, :OLD.surn2, 'null', 'null', 'null',
         oc.bill_town, oc.bill_country,
         'nul', 'null', 'null', oc.town, oc.country
