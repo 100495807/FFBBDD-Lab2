@@ -12,7 +12,7 @@ pedidos_anonim  AS (select trim(l.contact) as contact, l.orderdate, l.barcode, l
 						and
 						l.contact = o.contact)
 ),
-pedidos_anom_var as (
+pedidos_anom_varietal as (
 	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, trim(varietal) as varietal
 	from pedidos_anonim l 
 	join References r on l.barcode = r.barcode 
@@ -28,7 +28,7 @@ pedido_cliente AS (
 	orderdate BETWEEN TO_DATE('01/04/23', 'DD/MM/YY') AND TO_DATE('31/03/24', 'DD/MM/YY')
 ),
 total_pedidos AS (
-	SELECT * FROM pedidos_anom_var 
+	SELECT * FROM pedidos_anom_varietal 
 	UNION ALL 
 	SELECT * FROM pedido_cliente
 ),
@@ -148,3 +148,4 @@ MES   BARCODE         VECES_VENDIDO UNIDADES_VENDIDAS INGRESOS_TOTALES BENEFICIO
 MES   BARCODE         VECES_VENDIDO UNIDADES_VENDIDAS INGRESOS_TOTALES BENEFICIO_TOTAL
 ----- --------------- ------------- ----------------- ---------------- ---------------
 24/03 IOI86584I705567             2                25              220              22
+
