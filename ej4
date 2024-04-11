@@ -70,6 +70,7 @@ BEGIN
         Posts
     WHERE
         username = :OLD.username;
+        
     INSERT INTO Orders_Anonym (
         orderdate, contact, contact2, dliv_datetime, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
         bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
@@ -85,18 +86,15 @@ BEGIN
         Orders_Clients oc
     WHERE
         oc.username = :OLD.username;
-    DELETE FROM
-        Orders_Clients
-    WHERE
-        username = :OLD.username;
+    
     INSERT INTO Lines_Anonym (
         orderdate, contact, dliv_town, dliv_country,
-        barcode, price, quantity, pay_type, pay_datetime, card_num
+        barcode, price, quantity, pay_type, pay_datetime, card_num, card_comp, card_holder, card_expir
     )
     SELECT
         cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
         cl.town, cl.country, cl.barcode,
-        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum, 'null', 'null', sysdate
     FROM
         Client_Lines cl
     WHERE
@@ -105,9 +103,23 @@ BEGIN
         Client_Lines
     WHERE
         username = :OLD.username;
+    
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
 END;
 /
 
+
+select * from clients where username = 'po';
+select * from Orders_Clients where username = 'po';
+select * from Client_Lines where username = 'po'; 
+select * from posts where username = 'po'; 
+DELETE FROM Clients WHERE username = 'po';
+select * from AnonyPosts where title = 'OkYRBjV';
+select * from orders_anonym where name = 'Pedro Jose';
+select * from lines_anonym where contact = 'po@servcorreo.ucetreseme.kom';
 
 select * from clients where username = 'chavela';
 select * from Orders_Clients where username = 'chavela';
@@ -304,3 +316,66 @@ SELECT * FROM Client_Lines where username = 'gh' and barcode = '9876543210987';
 SELECT * FROM References where barcode = '9876543210987';
 SELECT * FROM Replacements;
 --Se ha creado un pedido en replacements
+
+
+
+
+CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
+BEFORE DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    DELETE FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
+        bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate,
+        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END,
+        :OLD.name, :OLD.surn1, :OLD.surn2, 'null', 'null', 'null',
+        oc.bill_town, oc.bill_country,
+        'nul', 'null', 'null', oc.town, oc.country
+    FROM
+        Orders_Clients oc
+    WHERE
+        oc.username = :OLD.username;
+
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country,
+        barcode, price, quantity, pay_type, pay_datetime, card_num
+    )
+    SELECT
+        cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        cl.town, cl.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+    FROM
+        Client_Lines cl
+    WHERE
+        cl.username = :OLD.username;
+
+    DELETE FROM
+        Client_Lines
+    WHERE
+        username = :OLD.username;
+END;
+/
