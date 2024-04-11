@@ -1,10 +1,8 @@
 --1--
 ALTER TABLE Posts MODIFY endorsed VARCHAR(1);
-
 DROP TRIGGER update_endorsed_trigger;
-
 CREATE OR REPLACE TRIGGER update_endorsed_trigger
-BEFORE INSERT OR UPDATE ON mis_comentarios
+BEFORE INSERT OR UPDATE ON Posts
 FOR EACH ROW
 DECLARE
     v_endorsed VARCHAR2(1);
@@ -40,40 +38,57 @@ VALUES (
     NULL
 );
 select * from mis_comentarios;
-
 --si se quiere probar que tambien funciona con el update hay que borrar el trigger de mis comentarios que impide modificar si el comentario tiene mas de 0 likes
-
 --DROP TRIGGER update_comentario_trigger;
 /*---UPDATE mis_comentarios
 SET text = 'Nuevo texto del comentario'
 WHERE username = user_pkg.current_user
 AND barcode = 'QIQ48187Q253088'
 AND postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
-
 select * from mis_comentarios; */
+
 
 
 --2--
 
+drop trigger TrasladarComprasAnonimas;
+-- dejando algo vacio orders_anonym
 CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
-AFTER DELETE ON Clients
+BEFORE DELETE ON Clients
 FOR EACH ROW
-DECLARE
 BEGIN
-    -- Insertar compras del cliente dado de baja en la tabla de compras anónimas
-    INSERT INTO Orders_Anonym (
-        orderdate, contact, dliv_datetime, 
-        name, surn1, surn2, 
-        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
-        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
     )
-    SELECT 
-        orderdate, username, town, country, dliv_datetime, bill_town, bill_country, discount
-    FROM 
-        Orders_Clients
-    WHERE 
+    SELECT
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM
+        Posts
+    WHERE
         username = :OLD.username;
-
+    DELETE FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, dliv_datetime, name, surn1, surn2, bill_waytype, bill_wayname, bill_ZIP,
+        bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate,
+        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END, oc.dliv_datetime,
+        :OLD.name, :OLD.surn1, :OLD.surn2, 'null', 'null', 'null',
+        oc.bill_town, oc.bill_country,
+        'nul', 'null', 'null', oc.town, oc.country
+    FROM
+        Orders_Clients oc
+    WHERE
+        oc.username = :OLD.username;
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
     INSERT INTO Lines_Anonym (
         orderdate, contact, dliv_town, dliv_country,
         barcode, price, quantity, pay_type, pay_datetime, card_num
@@ -86,7 +101,6 @@ BEGIN
         Client_Lines cl
     WHERE
         cl.username = :OLD.username;
-
     DELETE FROM
         Client_Lines
     WHERE
@@ -95,15 +109,20 @@ END;
 /
 
 
+select * from clients where username = 'chavela';
+select * from Orders_Clients where username = 'chavela';
+select * from Client_Lines where username = 'chavela'; 
+select * from posts where username = 'chavela'; 
 DELETE FROM Clients WHERE username = 'chavela';
 select * from AnonyPosts where title = 'OkYRBjV';
 select * from orders_anonym where name = 'Pia Chavela';
 select * from lines_anonym where contact = '555977658';
 
+
+
 -- 3 --
 -- Eliminar el trigger si existe
 DROP TRIGGER prevent_anonymous_purchase_trigger;
-
 -- Crear o reemplazar el trigger en la tabla real Client_Lines
 CREATE OR REPLACE TRIGGER prevent_anonymous_purchase_trigger
 BEFORE INSERT ON Lines_Anonym
@@ -128,15 +147,12 @@ BEGIN
     END IF;
 END;
 /
-
 -- Información de un usuario registrado y su tarjeta
 select TO_CHAR(cardnum) AS cardnum from Client_Cards WHERE username = 'gh';
-
 -- Intentar insertar una compra anónima utilizando una tarjeta de crédito asociada a un usuario registrado
 -- Debería generar un error ya que la tarjeta de crédito está asociada a 'gh'
 INSERT INTO Orders_Anonym (orderdate, contact, contact2, dliv_datetime, name, surn1, surn2, bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country, dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country)
 VALUES (TO_DATE('19/01/23', 'DD/MM/YY'), 'sagri@servcorreo.ucetreseme.kom', NULL, TO_DATE('21/01/23', 'DD/MM/YY'), 'Ana Sagrario', 'Lluque', 'Amaya', 'Avenue', 'Virgin of the Lane', '96', '8', 'D', '2', '1', '21091', 'Valcantos', 'Malta', 'Road', 'San Jose', '1', 'E', 'A ', '1', '2', '21091', 'Villaconejos de las Aguas', 'Malaysia');
-
 INSERT INTO Lines_Anonym (orderdate, contact, dliv_town, dliv_country, barcode, price, quantity, pay_type, pay_datetime, card_comp, card_num, card_holder, card_expir)
 VALUES (
     TO_DATE('19/01/23', 'DD/MM/YY'), 
@@ -153,8 +169,6 @@ VALUES (
     'Ana', 
     TO_DATE('05/07/34', 'DD/MM/YY')
 );
-
-
 -- Intentar insertar una compra anónima utilizando una tarjeta de crédito no asociada a ningún usuario
 -- Debería permitirse ya que la tarjeta de crédito no está asociada a ningún usuario registrado
 INSERT INTO Lines_Anonym (orderdate, contact, dliv_town, dliv_country, barcode, price, quantity, pay_type, pay_datetime, card_comp, card_num, card_holder, card_expir)
@@ -173,11 +187,9 @@ VALUES (
     'Ana', 
     TO_DATE('05/07/34', 'DD/MM/YY')
 );
-
 -- 4 --
 -- Eliminar el trigger si existe
 DROP TRIGGER update_stock_and_replenish_trigger;
-
 CREATE OR REPLACE TRIGGER update_stock_and_replenish_trigger
 AFTER INSERT ON Client_Lines 
 FOR EACH ROW 
@@ -205,16 +217,12 @@ BEGIN
         ORDER BY cost
     )
     WHERE ROWNUM = 1;
-
-
     -- Calcular la cantidad a pedir
     cantidad_pedir := GREATEST(stock_maximo - (stock_actual - :new.quantity), 0);
-
     -- Actualizar el stock actual
     UPDATE References
     SET cur_stock = cur_stock - :new.quantity
     WHERE barCode = :new.barCode;
-
     -- Generar un nuevo pedido de reposición si es necesario
     IF stock_minimo > (stock_actual - :new.quantity) THEN
         INSERT INTO Replacements (taxID, barCode, orderdate, status, units, payment)
@@ -222,7 +230,6 @@ BEGIN
     END IF;
 END actualizar_stock;
 /
-
 DROP TRIGGER update_stock_and_replenish_trigger_anonym;
 CREATE OR REPLACE TRIGGER update_stock_and_replenish_trigger_anonym
 AFTER INSERT ON Lines_Anonym
@@ -251,15 +258,12 @@ BEGIN
         ORDER BY cost
     )
     WHERE ROWNUM = 1;
-
     -- Calcular la cantidad a pedir
     cantidad_pedir := GREATEST(stock_maximo - (stock_actual - :new.quantity), 0);
-
     -- Actualizar el stock actual
     UPDATE References
     SET cur_stock = cur_stock - :new.quantity
     WHERE barCode = :new.barCode;
-
     -- Generar un nuevo pedido de reposición si es necesario
     IF stock_minimo > (stock_actual - :new.quantity) THEN
         INSERT INTO Replacements (taxID, barCode, orderdate, status, units, payment)
@@ -267,47 +271,35 @@ BEGIN
     END IF;
 END actualizar_stock_lines_anonym;
 /
-
 -- Insertar un nuevo producto en la tabla Varietals 
 INSERT INTO Varietals (name) VALUES ('Fito');
-
 -- Insertar un nuevo origen en la tabla Origins (si no existe)
 INSERT INTO Origins (name) VALUES ('Rusilandia');
-
 -- Insertar un nuevo producto en la tabla Products
 INSERT INTO Products (product, coffea, varietal, origin, roast, decaf)
 VALUES ('Café Especial', 'C', 'Fito', 'Rusilandia', 'N', 'N');
-
 -- Insertar una nueva fila en la tabla References
 INSERT INTO References (barcode, product, format, pack_type, pack_unit, quantity, price, cur_stock, min_stock, max_stock)
 VALUES ('9876543210987', 'Café Especial', 'C', 'Paquete', 'Gramo', 500, 25.99, 100, 50, 1000);
-
 -- Insertar un nuevo proveedor en la tabla Providers
 INSERT INTO Providers (taxID, name, person, email, mobile, address, country)
 VALUES ('1234567890', 'Coffee Supplier', 'John Doe', 'john@coffeesupplier.com', 987654321, '123 Main Street', 'United States');
-
 -- Insertar una nueva línea de suministro en la tabla Supply_Lines
 INSERT INTO Supply_Lines (taxID, barcode, cost)
 VALUES ('1234567890', '9876543210987', 20.99);
-
 -- Intentar insertar una fila en la tabla Client_Lines que no desencadene el disparador
 INSERT INTO Orders_Clients (orderdate, username, town, country, dliv_datetime, bill_town, bill_country)
 VALUES (TO_DATE('20/01/25', 'DD/MM/YY'), 'gh', 'Atalaya de los Caballeros', 'Iran, Islamic Republic of', TO_DATE('21/01/25', 'DD/MM/YY'), 'Atalaya de los Caballeros', 'Iran, Islamic Republic of');
-
 INSERT INTO Client_Lines (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
 VALUES (TO_DATE('20/01/25', 'DD/MM/YY'), 'gh', 'Atalaya de los Caballeros', 'Iran, Islamic Republic of', '9876543210987', 8.65, '5', 'COD', TO_DATE('21/01/25', 'DD/MM/YY'), '232382327775');
-
 SELECT * FROM Client_Lines where username = 'gh' and barcode = '9876543210987';
 SELECT * FROM References where barcode = '9876543210987';
 SELECT * FROM Replacements;
-
 -- Intentar insertar una fila en la tabla Client_Lines que si desencadene el disparador
 INSERT INTO Orders_Clients (orderdate, username, town, country, dliv_datetime, bill_town, bill_country)
 VALUES (TO_DATE('20/02/25', 'DD/MM/YY'), 'gh', 'Atalaya de los Caballeros', 'Iran, Islamic Republic of', TO_DATE('21/02/25', 'DD/MM/YY'), 'Atalaya de los Caballeros', 'Iran, Islamic Republic of');
-
 INSERT INTO Client_Lines (orderdate, username, town, country, barcode, price, quantity, pay_type, pay_datetime, cardnum)
 VALUES (TO_DATE('20/02/25', 'DD/MM/YY'), 'gh', 'Atalaya de los Caballeros', 'Iran, Islamic Republic of', '9876543210987', 8.65, '90', 'COD', TO_DATE('21/02/25', 'DD/MM/YY'), '232382327775');
-
 SELECT * FROM Client_Lines where username = 'gh' and barcode = '9876543210987';
 SELECT * FROM References where barcode = '9876543210987';
 SELECT * FROM Replacements;
