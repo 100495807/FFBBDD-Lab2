@@ -104,3 +104,41 @@ CREATE OR REPLACE PACKAGE BODY caffeine AS
 
 END caffeine;
 /
+
+
+--Pruebas para el ejercicio 2
+delete from Replacements;
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('E19951722G', 'OOQ99768I359618', TO_DATE('2024-02-27', 'YYYY-MM-DD'), 'D', 8, TO_DATE('2024-02-29', 'YYYY-MM-DD'), 33);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('E19951722G', 'QOO04729Q303504', TO_DATE('2024-02-27', 'YYYY-MM-DD'), 'D', 2, TO_DATE('2024-02-29', 'YYYY-MM-DD'), 206);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('E19951722G', 'QOO04729Q303504', TO_DATE('2023-08-25', 'YYYY-MM-DD'), 'P', 2, TO_DATE('2023-08-27', 'YYYY-MM-DD'), 233);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('E19951722G', 'QQQ36574O428230', TO_DATE('2021-08-25', 'YYYY-MM-DD'), 'P', 8, TO_DATE('2023-08-27', 'YYYY-MM-DD'), 245);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('J65047721H', 'OOI00113I413085', TO_DATE('2023-06-01', 'YYYY-MM-DD'), 'P', 8, TO_DATE('2023-06-03', 'YYYY-MM-DD'), 320);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('J65047721H', 'OOI00113I413085', TO_DATE('2023-06-02', 'YYYY-MM-DD'), 'P', 8, TO_DATE('2023-06-10', 'YYYY-MM-DD'), 280);
+
+INSERT INTO Replacements (taxID, barCode, orderdate, status, units, deldate, payment)
+VALUES
+('V04866272R', 'IOI83595O216284', TO_DATE('2024-02-22', 'YYYY-MM-DD'), 'D', 8, TO_DATE('2024-02-26', 'YYYY-MM-DD'), 120.75);
+
+
+BEGIN 
+    caffeine.Informe_Proveedor('E19951722G');
+END;
+/
