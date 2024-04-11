@@ -1,13 +1,12 @@
--- Esto es para regustrar el usuario que está en la sesión y para el que se realizan las vistas-
 CREATE OR REPLACE PACKAGE user_pkg AS
   FUNCTION current_user RETURN VARCHAR2;
 END user_pkg;
 /
--- Con esto nos registramos como gh para comprobar con datos ya creados en als tablas como sería para el usuario gh --
+
 CREATE OR REPLACE PACKAGE BODY user_pkg AS
   FUNCTION current_user RETURN VARCHAR2 IS
   BEGIN
-    RETURN current_user;           -- si quiere cambiarse a el usuario real que esta usando la sesión habría que cambiar 'gh' por 
+    RETURN 'gh';
   END current_user;
 END user_pkg;
 /
@@ -19,8 +18,6 @@ SELECT orderdate, username, town, country, barcode, price, quantity, pay_type, p
 FROM Client_Lines
 WHERE username = user_pkg.current_user;
 
-
--- para ver la vista --
 select * from Mis_compras;
 
 
@@ -51,7 +48,7 @@ LEFT JOIN Client_Addresses ca ON c.username = ca.username
 LEFT JOIN Client_Cards cc ON c.username = cc.username
 WHERE c.username = user_pkg.current_user;
 
--- para ver la vista --
+
 select * from Mi_perfil;
 
 
