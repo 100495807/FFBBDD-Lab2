@@ -4,3 +4,301 @@
 
 -- pregunta ej2 si accedo a Suply_lines para ver los costes de las referencias como puedo comprobar que la fecha esta comprendida entre el ultimo año
 
+
+
+
+drop trigger TrasladarComprasAnonimas;
+
+-- dejando algo vacio orders_anonym
+CREATE OR REPLACE TRIGGER TrasladarComprasAnonimas
+BEFORE DELETE ON Clients
+FOR EACH ROW
+BEGIN
+    INSERT INTO Orders_Anonym (
+        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, 
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door ,dliv_ZIP
+    )
+    SELECT
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP
+    FROM
+        Client_Addresses ca
+    WHERE
+        ca.username = :OLD.username;
+
+    DELETE FROM
+        Client_Addresses
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    DELETE FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+    
+
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, dliv_datetime, name, surn1, 
+        surn2, bill_town, bill_country, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate,
+        CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        CASE WHEN :OLD.email IS NULL THEN TO_CHAR(:OLD.mobile) END, oc.dliv_datetime,
+        :OLD.name, :OLD.surn1, :OLD.surn2, 
+        oc.bill_town, oc.bill_country, oc.town, oc.country
+    FROM
+        Orders_Clients oc
+    WHERE
+        oc.username = :OLD.username;
+
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country,
+        barcode, price, quantity, pay_type, pay_datetime, card_num
+    )
+    SELECT
+        cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        cl.town, cl.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+    FROM
+        Client_Lines cl
+    WHERE
+        cl.username = :OLD.username;
+
+    DELETE FROM
+        Client_Lines
+    WHERE
+        username = :OLD.username;
+END;
+/
+
+select * from clients where username = 'chavela';
+select * from Orders_Clients where username = 'chavela';
+select * from Client_Lines where username = 'chavela'; 
+select * from posts where username = 'chavela'; 
+
+DELETE FROM Clients WHERE username = 'chavela';
+
+select * from AnonyPosts where title = 'OkYRBjV';
+select * from orders_anonym where name = 'Pia Chavela';
+select * from lines_anonym where contact = '555977658';
+
+
+CREATE TABLE Client_Backup (
+  username      VARCHAR2(30),
+  reg_datetime  DATE,
+  user_passw    VARCHAR2(15),
+  name          VARCHAR2(35),
+  surn1         VARCHAR2(30),
+  surn2         VARCHAR2(30),
+  email         VARCHAR2(60),
+  mobile        NUMBER(9),
+  CONSTRAINT pk_client_backup PRIMARY KEY(username)
+);
+
+CREATE TABLE Client_Addresses_help (
+  username VARCHAR2(30),
+  waytype  VARCHAR2(10),
+  wayname  VARCHAR2(30),
+  gate     VARCHAR2(3),
+  block    VARCHAR2(1),
+  stairw   VARCHAR2(2),
+  floor    VARCHAR2(7),
+  door     VARCHAR2(2),
+  ZIP      VARCHAR2(5),
+  town     VARCHAR2(45),
+  country  VARCHAR2(45)
+);
+
+CREATE OR REPLACE TRIGGER backup_before_delete
+before INSERT ON Clients
+FOR EACH ROW
+BEGIN
+  INSERT INTO Client_Backup (username, reg_datetime, user_passw, name, surn1, surn2, email, mobile)
+  VALUES (:OLD.username, :OLD.reg_datetime, :OLD.user_passw, :OLD.name, :OLD.surn1, :OLD.surn2, :OLD.email, :OLD.mobile);
+END;
+/
+
+CREATE OR REPLACE TRIGGER backup_before_delete_addres
+before INSERT ON Clients
+FOR EACH ROW
+BEGIN
+    insert into Client_Addresses_help (
+        username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
+    )
+    select 
+        username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
+    from 
+        Client_Addresses
+    where 
+        username = :OLD.username;
+END;
+/
+
+CREATE OR REPLACE TRIGGER trasladar_datos_anonimos
+after DELETE ON Clients
+FOR EACH ROW
+BEGIN 
+
+    INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, dliv_datetime, name, surn1, surn2,  
+        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate, 
+        CASE WHEN cb.email IS NOT NULL THEN cb.email ELSE TO_CHAR(cb.mobile) END AS contact, 
+        CASE WHEN cb.email IS NOT NULL THEN cb.mobile ELSE NULL END AS contact2,
+        oc.dliv_datetime, cb.name, cb.surn1, cb.surn2,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, oc.bill_town, oc.bill_country,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, oc.bill_town, oc.bill_country
+    FROM
+        Orders_Clients oc
+    JOIN 
+        Client_Backup cb ON oc.username = cb.username
+    JOIN 
+        Client_Addresses_help ca ON oc.username = ca.username
+    WHERE
+        oc.username = :OLD.username;
+
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country,
+        barcode, price, quantity, pay_type, pay_datetime, card_num
+    )
+    SELECT
+        cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        cl.town, cl.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+    FROM
+        Client_Lines cl
+    WHERE
+        cl.username = :OLD.username;
+
+    DELETE FROM
+        Client_Lines
+    WHERE
+        username = :OLD.username;
+
+
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    DELETE FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+END;
+/
+
+create or replace trigger double_insert
+for delete on clients
+COMPOUND TRIGGER
+TYPE temp_tab IS TABLE OF Client_Addresses%rowtype index by binary_integer;
+vartabla temp_tab;
+before each row is
+begin
+insert into vartabla (
+        username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
+    )
+    select 
+        username, waytype, wayname, gate, block, stairw, floor, door, ZIP, town, country
+    from 
+        Client_Addresses
+    where 
+        username = :OLD.username;
+end before each row;
+
+after statement is
+begin
+for i in 1..vartabla.count loop
+INSERT INTO Orders_Anonym (
+        orderdate, contact, contact2, dliv_datetime, name, surn1, surn2,  
+        bill_waytype, bill_wayname, bill_gate, bill_block, bill_stairw, bill_floor, bill_door, bill_ZIP, bill_town, bill_country,
+        dliv_waytype, dliv_wayname, dliv_gate, dliv_block, dliv_stairw, dliv_floor, dliv_door, dliv_ZIP, dliv_town, dliv_country
+    )
+    SELECT
+        oc.orderdate, 
+        CASE WHEN cb.email IS NOT NULL THEN cb.email ELSE TO_CHAR(cb.mobile) END AS contact, 
+        CASE WHEN cb.email IS NOT NULL THEN cb.mobile ELSE NULL END AS contact2,
+        oc.dliv_datetime, cb.name, cb.surn1, cb.surn2,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, oc.bill_town, oc.bill_country,
+        ca.waytype, ca.wayname, ca.gate, ca.block, ca.stairw, ca.floor, ca.door, ca.ZIP, oc.bill_town, oc.bill_country
+    FROM
+        Orders_Clients oc
+    JOIN 
+        Client_Backup cb ON oc.username = cb.username
+    JOIN 
+        Client_Addresses_help ca ON oc.username = ca.username
+    WHERE
+        oc.username = :OLD.username;
+
+    DELETE FROM
+        Orders_Clients
+    WHERE
+        username = :OLD.username;
+
+    INSERT INTO Lines_Anonym (
+        orderdate, contact, dliv_town, dliv_country,
+        barcode, price, quantity, pay_type, pay_datetime, card_num
+    )
+    SELECT
+        cl.orderdate, CASE WHEN :OLD.email IS NOT NULL THEN :OLD.email ELSE TO_CHAR(:OLD.mobile) END,
+        cl.town, cl.country, cl.barcode,
+        cl.price, cl.quantity, cl.pay_type, cl.pay_datetime, cl.cardnum
+    FROM
+        Client_Lines cl
+    WHERE
+        cl.username = :OLD.username;
+
+    DELETE FROM
+        Client_Lines
+    WHERE
+        username = :OLD.username;
+
+
+    INSERT INTO AnonyPosts (
+        postdate, barCode, product, score, title, text, likes, endorsed
+    )
+    SELECT
+        postdate, barCode, product, score, title, text, likes, endorsed
+    FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+
+    DELETE FROM
+        Posts
+    WHERE
+        username = :OLD.username;
+    end loop;
+end after statement;
+end double_insert;
+/

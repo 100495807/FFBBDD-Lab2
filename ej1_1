@@ -16,7 +16,7 @@ pedidos_anonim  AS (select l.contact as contact, l.orderdate, l.barcode, l.price
 						l.contact = o.contact)
 ),
 -- informacion de clientes anonimos y pedios
-pedidos_anom_var as (
+pedidos_anom_varietal as (
 	select l.contact as username, l.orderdate, l.barcode, l.price, l.quantity, pais as country, varietal as varietal
 	from pedidos_anonim l 
 	join References r on l.barcode = r.barcode 
@@ -34,7 +34,7 @@ pedido_cliente AS (
 ),
 -- Unimos todos los pedidos
 total_pedidos AS (
-	SELECT * FROM pedidos_anom_var 
+	SELECT * FROM pedidos_anom_varietal 
 	UNION ALL 
 	SELECT * FROM pedido_cliente
 ),
