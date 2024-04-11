@@ -1,8 +1,10 @@
-drop trigger update_endorsed_trigger;
-ALTER TABLE aux_posts MODIFY endorsed VARCHAR(1);
+--1--
+ALTER TABLE Posts MODIFY endorsed VARCHAR(1);
+
+DROP TRIGGER update_endorsed_trigger;
 
 CREATE OR REPLACE TRIGGER update_endorsed_trigger
-BEFORE INSERT OR UPDATE ON Posts
+BEFORE INSERT OR UPDATE ON mis_comentarios
 FOR EACH ROW
 DECLARE
     v_endorsed VARCHAR2(1);
@@ -24,7 +26,6 @@ BEGIN
     :NEW.endorsed := v_endorsed;
 END;
 /
-
 -- Realizar las inserciones en la tabla Posts existente en la base de datos
 INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
 VALUES (
@@ -43,7 +44,6 @@ select * from mis_comentarios;
 --si se quiere probar que tambien funciona con el update hay que borrar el trigger de mis comentarios que impide modificar si el comentario tiene mas de 0 likes
 
 --DROP TRIGGER update_comentario_trigger;
-
 /*---UPDATE mis_comentarios
 SET text = 'Nuevo texto del comentario'
 WHERE username = user_pkg.current_user
@@ -51,7 +51,6 @@ AND barcode = 'QIQ48187Q253088'
 AND postdate = TO_DATE('2024-04-06', 'YYYY-MM-DD');
 
 select * from mis_comentarios; */
-
 
 
 --2--

@@ -60,7 +60,7 @@ CREATE OR REPLACE VIEW mis_comentarios AS
 SELECT username, postdate, barcode, product, score, title, likes, endorsed, text
 FROM Posts
 WHERE username = user_pkg.current_user;
-
+  
 -- insertar comentarios -- 
 CREATE OR REPLACE TRIGGER insert_comentario_trigger
 BEFORE INSERT ON Posts
