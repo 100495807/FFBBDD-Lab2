@@ -6,7 +6,7 @@ END user_pkg;
 CREATE OR REPLACE PACKAGE BODY user_pkg AS
   FUNCTION current_user RETURN VARCHAR2 IS
   BEGIN
-    RETURN 'gh';
+    RETURN current_user;
   END current_user;
 END user_pkg;
 /
@@ -58,36 +58,61 @@ SELECT username, postdate, barcode, product, score, title, likes, endorsed, text
 FROM Posts
 WHERE username = user_pkg.current_user;
 
--- insertar comentarios -- 
+-- Eliminar los disparadores existentes
+DROP TRIGGER insert_comentario_trigger;
+DROP TRIGGER update_comentario_trigger;
+DROP TRIGGER delete_comentario_trigger;
+
+-- Crear el disparador INSTEAD OF INSERT
 CREATE OR REPLACE TRIGGER insert_comentario_trigger
-BEFORE INSERT ON Posts
+INSTEAD OF INSERT ON mis_comentarios
 FOR EACH ROW
 BEGIN
     IF :NEW.likes > 0 THEN
         RAISE_APPLICATION_ERROR(-20001, 'No se pueden insertar comentarios con "likes" mayores que cero.');
+    ELSE
+        INSERT INTO Posts (username, postdate, barcode, product, score, title, text, likes, endorsed)
+        VALUES (:NEW.username, :NEW.postdate, :NEW.barcode, :NEW.product, :NEW.score, :NEW.title, :NEW.text, :NEW.likes, :NEW.endorsed);
     END IF;
 END;
 /
 
--- Actualizar comentarios --
+-- Crear el disparador INSTEAD OF UPDATE
 CREATE OR REPLACE TRIGGER update_comentario_trigger
-BEFORE UPDATE ON Posts
+INSTEAD OF UPDATE ON mis_comentarios
 FOR EACH ROW
 BEGIN
-  IF :OLD.likes > 0 THEN
-    RAISE_APPLICATION_ERROR(-20002, 'No se puede cambiar el texto de un comentario con "likes" mayores que cero.');
-  END IF;
+    IF :OLD.likes > 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede cambiar el texto de un comentario con "likes" mayores que cero.');
+    ELSE
+        UPDATE Posts
+        SET text = :NEW.text
+        WHERE username = :NEW.username
+        AND postdate = :NEW.postdate
+        AND barcode = :NEW.barcode
+        AND product = :NEW.product
+        AND score = :NEW.score
+        AND title = :NEW.title;
+    END IF;
 END;
 /
 
--- Eliminar comentarios --
+-- Crear el disparador INSTEAD OF DELETE
 CREATE OR REPLACE TRIGGER delete_comentario_trigger
-BEFORE DELETE ON Posts
+INSTEAD OF DELETE ON mis_comentarios
 FOR EACH ROW
 BEGIN
-  IF :OLD.likes > 0 THEN
-    RAISE_APPLICATION_ERROR(-20003, 'No se puede eliminar un comentario con "likes" mayores que cero.');
-  END IF;
+    IF :OLD.likes > 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'No se puede eliminar un comentario con "likes" mayores que cero.');
+    ELSE
+        DELETE FROM Posts
+        WHERE username = :OLD.username
+        AND postdate = :OLD.postdate
+        AND barcode = :OLD.barcode
+        AND product = :OLD.product
+        AND score = :OLD.score
+        AND title = :OLD.title;
+    END IF;
 END;
 /
 
