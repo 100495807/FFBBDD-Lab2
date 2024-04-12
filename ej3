@@ -6,7 +6,7 @@ END user_pkg;
 CREATE OR REPLACE PACKAGE BODY user_pkg AS
   FUNCTION current_user RETURN VARCHAR2 IS
   BEGIN
-    RETURN current_user;
+    RETURN 'gh';
   END current_user;
 END user_pkg;
 /
@@ -116,8 +116,6 @@ BEGIN
 END;
 /
 
-select * from mis_comentarios;
-
 
 -- Error al introducir el comentario
 INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
@@ -126,6 +124,7 @@ VALUES (user_pkg.current_user, SYSDATE, 'IQO47507I223966', 'Lirios o manana', 5,
 -- Introducir el comentario
 INSERT INTO mis_comentarios (username, postdate, barCode, product, score, title, text, likes, endorsed)
 VALUES (user_pkg.current_user, SYSDATE, 'IQO47507I223966', 'Lirios o manana', 5, 'titulo', 'Nuevo texto del comentario', 0, NULL);
+select * from mis_comentarios where title = 'titulo';
 
 
 -- Error al actualizar el comentario
@@ -137,7 +136,7 @@ WHERE title = 'ZQVrkeOr';
 UPDATE mis_comentarios
 SET text = 'Este es el nuevo texto del comentario'
 WHERE title = 'titulo';
-
+select * from mis_comentarios where title = 'titulo';
 
 -- Error al eliminar el comentario existente
 DELETE FROM mis_comentarios
@@ -146,3 +145,4 @@ WHERE title = 'ZQVrkeOr';
 -- Eliminar el comentario existente
 DELETE FROM mis_comentarios
 WHERE title = 'titulo';
+select * from mis_comentarios where title = 'titulo';
